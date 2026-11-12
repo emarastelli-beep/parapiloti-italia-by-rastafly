@@ -38,7 +38,7 @@ function MapView({ pilots, ownPosition, trail }) {
     <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
     <FollowPilot ownPosition={ownPosition} />
     <CenterMapButton ownPosition={ownPosition} />
-    {trail.length > 1 && <Polyline positions={trail.map(p => [p.lat, p.lng])} pathOptions={{ color: "#e05b35", weight: 3, opacity: 0.95, lineCap: "round", lineJoin: "round" }} />}
+    {trail.length > 1 && <Polyline positions={trail.map(p => [p.lat, p.lng])} pathOptions={{ color: "#e05b35", weight: 2.5, opacity: 0.95, dashArray: "5 7", lineCap: "round", lineJoin: "round" }} />}
     {ownPosition?.heading != null && Number.isFinite(Number(ownPosition.heading)) && (() => {
       const bearing = Number(ownPosition.heading) * Math.PI / 180;
       const distance = 85;
@@ -122,8 +122,27 @@ function App() {
       const { error } = await supabase.from("flight_sessions").insert({ pilot_id: profile?.id || session.user.id });
       if (error) setStatus("Posizione inviata, ma apertura sessione non riuscita: " + error.message);
       window.__flightWatch = navigator.geolocation.watchPosition(async next => {
-        const q = { lat: next.coords.latitude, lng: next.coords.longitude, altitude_m: next.coords.altitude == null ? null : Math.round(next.coords.altitude), speed_kmh: next.coords.speed == null ? null : Math.round(next.coords.speed * 3.6), heading: next.coords.heading, updated_at: new Date().toISOString() };
-        setOwnPosition(q); setTrail(prev => [...prev.filter(point => Date.now() - point.time <= 60000), {lat:q.lat,lng:q.lng,time:Date.now()}]); await publishPosition(q);
+        const q = { lat: next.coords.latitude, lng: next.coords.longitude, altitude_m: next.coords.altitude == null ? null : Math.round(next.coords.altitude), speed_kmh: next.coords.speed == null ? null : Math.round(next.coords.speed * 3.6), heading: next.coords.heading, accuracy_m: next.coords.accuracy, updated_at: new Date().toISOString() };
+        setOwnPosition(q);
+        setTrail(prev => {
+          const now = Date.now();
+          const recent = prev.filter(point => now - point.time <= 60000);
+          const last = recent[recent.length - 1];
+          if (next.coords.accuracy > 35) return recent;
+          if (last) {
+            const rad = Math.PI / 180;
+            const dLat = (q.lat - last.lat) * 111320;
+            const dLng = (q.lng - last.lng) * 111320 * Math.cos(last.lat * rad);
+            const distance = Math.hypot(dLat, dLng);
+            const elapsed = Math.max(0.5, (now - last.time) / 1000);
+            const gpsSpeed = next.coords.speed;
+            // Ignore stationary GPS drift and implausible position jumps.
+            if (distance < 4 || (gpsSpeed != null && gpsSpeed < 1.5 && distance < 12)) return recent;
+            if (distance / elapsed > 45) return recent;
+          }
+          return [...recent, {lat:q.lat,lng:q.lng,time:now}];
+        });
+        await publishPosition(q);
       }, err => setGpsError(err.message), { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
     }, err => setGpsError(err.message), { enableHighAccuracy: true, timeout: 20000 });
   }
