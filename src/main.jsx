@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { createClient } from "@supabase/supabase-js";
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, Tooltip, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
 import { Wind, Map as MapIcon, Users, UserCircle, Plane, Square, LogOut, Shield, Mail, LocateFixed, Clock3, Gauge, Route, Menu, X } from "lucide-react";
 import "leaflet/dist/leaflet.css";
@@ -39,7 +39,7 @@ function MapView({ pilots, ownPosition, trail }) {
     <FollowPilot ownPosition={ownPosition} />
     <CenterMapButton ownPosition={ownPosition} />
     {trail.length > 1 && <Polyline positions={trail.map(p => [p.lat, p.lng])} pathOptions={{ color: "#e05b35", weight: 5, opacity: 0.9 }} />}
-    {pilots.map(p => <Marker key={p.id} position={[p.lat, p.lng]} icon={pilotIcon}><Popup><b>{p.nickname}</b><br />{p.region || "Italia"}<br />{p.altitude_m ?? "—"} m · {p.speed_kmh ?? "—"} km/h<br />Prua GPS: {p.heading == null ? "—" : Math.round(p.heading) + "° T"}{p.demo ? <><br /><small>Posizione dimostrativa</small></> : null}</Popup></Marker>)}
+    {pilots.map(p => <Marker key={p.id} position={[p.lat, p.lng]} icon={pilotIcon}><Tooltip permanent direction="top" offset={[0, -30]} opacity={1} className="pilot-name-label">{p.nickname || "Pilota"}</Tooltip><Popup><b>{p.nickname}</b><br />{p.region || "Italia"}<br />{p.altitude_m ?? "—"} m · {p.speed_kmh ?? "—"} km/h<br />Prua GPS: {p.heading == null ? "—" : Math.round(p.heading) + "° T"}{p.demo ? <><br /><small>Posizione dimostrativa</small></> : null}</Popup></Marker>)}
   </MapContainer>;
 }
 
