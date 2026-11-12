@@ -104,7 +104,7 @@ function App() {
 
   async function publishPosition(p) {
     if (!supabase || !session) return;
-    const { error } = await supabase.from("live_positions").upsert({ user_id: session.user.id, latitude: p.lat, longitude: p.lng, altitude_m: p.altitude_m, speed_kmh: p.speed_kmh, heading: p.heading, updated_at: p.updated_at });
+    const { error } = await supabase.from("live_positions").upsert({ pilot_id: profile?.id || session.user.id, user_id: session.user.id, latitude: p.lat, longitude: p.lng, altitude_m: p.altitude_m, speed_kmh: p.speed_kmh, heading: p.heading, updated_at: p.updated_at }, { onConflict: "pilot_id" });
     if (error) setStatus("Errore invio posizione: " + error.message);
     else refreshPilots();
   }
