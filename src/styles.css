@@ -54,3 +54,24 @@ footer{display:flex;justify-content:center;align-items:center;gap:22px;flex-wrap
 .creator-credit{padding:8px 13px;border:1px solid #9cb78b;border-radius:6px;background:#f5f8ee;color:#47604b;letter-spacing:1.5px;font-size:9px}
 .creator-credit strong{color:#1e684d;font-size:11px}
 @media(max-width:850px){footer{gap:8px}.creator-credit{order:-1}}
+
+/* PARAMOTOR PRO — rafforzamento visivo */
+.topbar{min-height:88px;background:linear-gradient(110deg,#101d18,#183b2c 62%,#2c5b43);border-bottom:3px solid #c7df72}
+.brand-mark{width:48px;height:48px;background:#c7df72;color:#14251f;box-shadow:0 0 0 4px #c7df7222}
+.brand strong{font-size:21px;letter-spacing:-.5px}
+.brand span{font-size:10px;letter-spacing:2.8px;color:#d2e2d5}
+.brand-creator{display:block;margin-top:5px;font-size:8px;font-weight:800;letter-spacing:2px;color:#c7df72}
+.hero{position:relative;padding-top:34px;padding-bottom:30px}
+.hero:after{content:"PARAMOTOR PRO  /  ITALIA";display:block;position:absolute;right:25px;top:38px;color:#648574;font-size:9px;font-weight:800;letter-spacing:2px}
+.hero h1{max-width:680px;font-size:clamp(38px,5.4vw,58px);letter-spacing:-2.4px}
+.hero h1 em{color:#267653}
+.hero .eyebrow{color:#347a5c;letter-spacing:2.4px}
+.main-panel{border:1px solid #c9d9ce;border-top:5px solid #2e8062;border-radius:20px;box-shadow:0 14px 36px #183b2c18}
+.panel-heading h2{font-size:27px;letter-spacing:-.7px}
+.live-pill{border:1px solid #c7df72;background:#eff6e4}
+.side-card{border-radius:17px}
+.primary-btn{background:linear-gradient(135deg,#2e8062,#1d5d43);box-shadow:0 5px 14px #1d5d4326}
+footer{background:#142820;color:#b8cbbb;border-top:3px solid #c7df72}
+.creator-credit{background:#263e31;border-color:#829b63;color:#d8e6cb}
+.creator-credit strong{color:#c7df72}
+@media(max-width:850px){.hero{padding-top:28px}.hero:after{position:static;margin-top:22px;text-align:left}.hero h1{font-size:clamp(38px,9vw,52px)}}
