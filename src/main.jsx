@@ -116,16 +116,44 @@ function App() {
     setLogbookLoading(false);
   }
 
+  function flightGpx(flight) {
+    const points = (flight.points || []).filter(p => Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lng)));
+    const track = points.map(p => `      <trkpt lat="${Number(p.lat)}" lon="${Number(p.lng)}"><time>${new Date(p.recorded_at || flight.started_at).toISOString()}</time></trkpt>`).join("\n");
+    return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="ParaPiloti Italia · RASTA7212" xmlns="http://www.topografix.com/GPX/1/1"><metadata><name>Volo ParaPiloti Italia</name><time>${new Date(flight.started_at).toISOString()}</time></metadata><trk><name>Traccia GPS</name><trkseg>\n${track}\n    </trkseg></trk></gpx>`;
+  }
+
+  function exportFlightGpx(flight) {
+    const points = flight.points || [];
+    if (points.length < 2) { setStatus("Non ci sono abbastanza punti GPS per esportare la traccia."); return; }
+    const blob = new Blob([flightGpx(flight)], { type: "application/gpx+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `parapiloti-volo-${new Date(flight.started_at).toISOString().slice(0,10)}.gpx`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    setStatus("Traccia GPX esportata.");
+  }
+
   async function shareFlight(flight) {
     const durationMs = Math.max(0, new Date(flight.ended_at) - new Date(flight.started_at));
     const mins = Math.floor(durationMs / 60000);
     const duration = `${String(Math.floor(mins / 60)).padStart(2,"0")}:${String(mins % 60).padStart(2,"0")}`;
     const date = new Date(flight.started_at).toLocaleString("it-IT", { dateStyle: "long", timeStyle: "short" });
-    const message = `Il mio volo con ParaPiloti Italia 🪂\nData: ${date}\nDurata: ${duration}\nTraccia GPS registrata.\nCreated by RASTA7212`;
+    const points = (flight.points || []).length;
+    const message = `Il mio volo con ParaPiloti Italia 🪂\nData: ${date}\nDurata: ${duration}\nPunti GPS: ${points}\nTraccia in formato GPX allegata quando supportato.\nCreated by RASTA7212`;
     try {
-      if (navigator.share) await navigator.share({ title: "Il mio volo · ParaPiloti Italia", text: message });
-      else if (navigator.clipboard) { await navigator.clipboard.writeText(message); setStatus("Riepilogo del volo copiato: puoi incollarlo sui social."); }
-      else setStatus(message);
+      const gpx = new File([flightGpx(flight)], `parapiloti-volo-${new Date(flight.started_at).toISOString().slice(0,10)}.gpx`, { type: "application/gpx+xml" });
+      if (navigator.share && navigator.canShare?.({ files: [gpx] })) {
+        await navigator.share({ title: "Il mio volo · ParaPiloti Italia", text: message, files: [gpx] });
+      } else if (navigator.share) {
+        await navigator.share({ title: "Il mio volo · ParaPiloti Italia", text: message });
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(message);
+        setStatus("Riepilogo copiato. Puoi esportare la traccia GPX dal dettaglio del volo.");
+      } else setStatus(message);
     } catch (e) { if (e.name !== "AbortError") setStatus("Condivisione non disponibile su questo dispositivo."); }
   }
 
@@ -291,7 +319,8 @@ function App() {
       <p>{new Date(selectedFlight.started_at).toLocaleTimeString("it-IT", {hour:"2-digit",minute:"2-digit"})} – {new Date(selectedFlight.ended_at).toLocaleTimeString("it-IT", {hour:"2-digit",minute:"2-digit"})}</p>
       <div className="flight-modal-map"><FlightTrackMap points={selectedFlight.points || []}/></div>
       <div className="flight-modal-stats"><span><small>DURATA</small><b>{String(Math.floor((new Date(selectedFlight.ended_at)-new Date(selectedFlight.started_at))/3600000)).padStart(2,"0")}:{String(Math.floor(((new Date(selectedFlight.ended_at)-new Date(selectedFlight.started_at))%3600000)/60000)).padStart(2,"0")}</b></span><span><small>PUNTI GPS</small><b>{(selectedFlight.points || []).length}</b></span></div>
-      <button className="primary-btn full" onClick={() => shareFlight(selectedFlight)}><Share2 size={17}/> Condividi il volo</button>
+      <button className="primary-btn full" onClick={() => shareFlight(selectedFlight)}><Share2 size={17}/> Condividi volo e traccia</button>
+      <button className="outline-btn full" onClick={() => exportFlightGpx(selectedFlight)}><Route size={17}/> Esporta traccia GPX</button>
       <small className="muted">La traccia è un riepilogo GPS indicativo, non uno strumento di navigazione.</small>
     </section></div>}
     <footer><span>© {new Date().getFullYear()} ParaPiloti in volo Italia by Rastafly</span><span>Prototipo tecnico · Non è un dispositivo di sicurezza aeronautica</span></footer>
