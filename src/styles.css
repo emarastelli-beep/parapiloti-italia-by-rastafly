@@ -104,3 +104,7 @@ footer{background:#0b2032;border-top:2px solid #64b5df;color:#b8d2e1}
 .creator-credit{background:#173b55;border-color:#4f8cad;color:#d9edf7}
 .creator-credit strong{color:#83c9ed}
 @media(max-width:850px){.topbar{height:92px;padding-left:18px;padding-right:18px}.brand{min-width:0;gap:12px}.brand-mark{width:54px;height:54px;flex:0 0 54px}.brand-mark svg{width:50px;height:50px}.brand-wordmark strong{font-size:20px}.brand-creator{font-size:8px;letter-spacing:2px}.hero{padding-top:30px}}
+
+/* Etichetta discreta del nome pilota sulla mappa */
+.leaflet-tooltip.pilot-name-label{background:#10283b;color:#f7fbfd;border:1px solid #83c9ed;border-radius:7px;padding:4px 8px;box-shadow:0 2px 8px #10283b40;font:700 11px 'DM Sans',sans-serif;letter-spacing:.2px;white-space:nowrap}
+.leaflet-tooltip-top.pilot-name-label:before{border-top-color:#10283b}
