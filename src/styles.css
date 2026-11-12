@@ -26,3 +26,31 @@
 .center-map-btn{position:absolute;z-index:650;top:14px;right:14px;width:48px;height:48px;border:0;border-radius:12px;background:#fff;color:#176b57;box-shadow:0 2px 12px #10283b44;display:grid;place-items:center;cursor:pointer}.center-map-btn:active{transform:scale(.96)}.app-shell.flight-mode .center-map-btn{position:fixed;top:calc(env(safe-area-inset-top) + 14px);right:14px;width:52px;height:52px;border-radius:50%;box-shadow:0 3px 14px #10283b55}
 
 .center-map-btn{position:absolute;z-index:1000;top:14px;right:14px;min-width:48px;height:48px;padding:0 12px;border:0;border-radius:12px;background:#fff;color:#176b57;box-shadow:0 2px 12px #10283b44;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;font:800 10px 'DM Sans';letter-spacing:.5px}.center-map-btn:active{transform:scale(.96)}.app-shell.flight-mode .center-map-btn{position:fixed;top:calc(env(safe-area-inset-top) + 100px);right:14px;height:52px;border-radius:26px;box-shadow:0 3px 14px #10283b55}
+
+/* PARAMOTOR PRO — identità aeronautica */
+:root{--pro-ink:#14251f;--pro-panel:#1d332b;--pro-green:#2e8062;--pro-lime:#c7df72;--pro-amber:#e4ad45}
+body{background:#e9efeb;color:var(--pro-ink)}
+.topbar{background:linear-gradient(105deg,#101f1a 0%,#1b382d 72%,#244637 100%);border-bottom:2px solid var(--pro-lime)}
+.brand-mark{background:var(--pro-lime);color:#14251f;border-radius:10px}
+.brand span{color:#c4d5c9}
+.nav .nav-active,.nav button:hover{background:#ffffff20;color:var(--pro-lime)}
+.hero h1 em{color:var(--pro-green)}
+.eyebrow.dark{color:var(--pro-green)}
+.live-pill{background:#e6f1e9;color:#246b50}
+.live-pill i,.pulse{background:#a7c95a}
+.main-panel,.side-card{border-color:#d7e2da;box-shadow:0 10px 28px #173a2b12}
+.main-panel{border-top:3px solid var(--pro-green)}
+.panel-heading h2,.side-card h3{color:#1b382d}
+.primary-btn,.small-primary{background:#2d7658;color:#fff}
+.primary-btn:hover{background:#205d44}
+.danger-btn{background:#a9433f}
+.map-wrap{border:1px solid #cbd9cf}
+.flight-control{background:#f7faf7;border-color:#dce6de}
+.dark-card{background:linear-gradient(145deg,#142a22,#244637);border:1px solid #365d49}
+.card-icon{background:#ffffff16;color:var(--pro-lime)}
+.privacy-line{color:#d4e8b0}
+.feature-line{color:#397b5d}
+footer{display:flex;justify-content:center;align-items:center;gap:22px;flex-wrap:wrap;padding:22px 18px 28px;color:#728278;font-size:10px;letter-spacing:.25px}
+.creator-credit{padding:8px 13px;border:1px solid #9cb78b;border-radius:6px;background:#f5f8ee;color:#47604b;letter-spacing:1.5px;font-size:9px}
+.creator-credit strong{color:#1e684d;font-size:11px}
+@media(max-width:850px){footer{gap:8px}.creator-credit{order:-1}}
