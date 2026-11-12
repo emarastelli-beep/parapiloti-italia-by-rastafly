@@ -75,3 +75,32 @@ footer{background:#142820;color:#b8cbbb;border-top:3px solid #c7df72}
 .creator-credit{background:#263e31;border-color:#829b63;color:#d8e6cb}
 .creator-credit strong{color:#c7df72}
 @media(max-width:850px){.hero{padding-top:28px}.hero:after{position:static;margin-top:22px;text-align:left}.hero h1{font-size:clamp(38px,9vw,52px)}}
+
+/* SKY AVIATION — minimalismo aeronautico */
+:root{--sky-navy:#10283b;--sky-blue:#267eae;--sky-ice:#eaf3f8;--sky-line:#9fc7dc;--sky-white:#f8fbfd}
+body{background:#edf4f8;color:var(--sky-navy)}
+.topbar{height:88px;background:linear-gradient(100deg,#0b2032 0%,#123b59 58%,#17618a 100%);border-bottom:3px solid #64b5df;box-shadow:0 5px 22px #0b203233}
+.brand{gap:14px;min-width:260px}
+.brand-mark{width:58px;height:58px;border-radius:50%;background:#dcecf5;color:var(--sky-navy);display:grid;place-items:center;box-shadow:0 0 0 4px #ffffff18;border:1px solid #9fc7dc}
+.brand-mark svg{width:54px;height:54px}
+.brand-wordmark strong{display:block;color:#fff;font:800 22px Manrope;letter-spacing:-.7px;white-space:nowrap}
+.brand-wordmark strong span{color:#83c9ed}
+.brand-creator{display:block;margin-top:5px;color:#b9d8e9;font-size:9px;font-weight:800;letter-spacing:2.4px}
+.nav button:hover,.nav .nav-active{background:#ffffff18;color:#fff}
+.hero{padding-top:38px}
+.hero .eyebrow,.eyebrow.dark{color:#267eae}
+.hero h1{color:#10283b}
+.hero h1 em{color:#267eae}
+.hero-stats b{color:#176b96}
+.main-panel,.side-card{border-color:#cbdde8;box-shadow:0 10px 30px #163b5310}
+.main-panel{border-top:4px solid #267eae}
+.panel-heading h2,.side-card h3{color:#102f47}
+.live-pill{color:#176b96;background:#e4f2f9;border:1px solid #b8d9e9}
+.live-pill i,.pulse{background:#42a5d2}
+.primary-btn,.small-primary{background:#176b96;color:#fff}
+.primary-btn:hover{background:#105477}
+.map-wrap{border:1px solid #b8d2e1}
+footer{background:#0b2032;border-top:2px solid #64b5df;color:#b8d2e1}
+.creator-credit{background:#173b55;border-color:#4f8cad;color:#d9edf7}
+.creator-credit strong{color:#83c9ed}
+@media(max-width:850px){.topbar{height:92px;padding-left:18px;padding-right:18px}.brand{min-width:0;gap:12px}.brand-mark{width:54px;height:54px;flex:0 0 54px}.brand-mark svg{width:50px;height:50px}.brand-wordmark strong{font-size:20px}.brand-creator{font-size:8px;letter-spacing:2px}.hero{padding-top:30px}}
