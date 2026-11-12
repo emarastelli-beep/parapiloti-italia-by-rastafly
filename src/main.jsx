@@ -16,7 +16,7 @@ const demoPilots = [
   { id: "demo-2", nickname: "SkyLombardia", region: "Lombardia", lat: 45.62, lng: 9.82, altitude_m: 610, speed_kmh: 28, heading: 205, demo: true },
   { id: "demo-3", nickname: "TuscanyFly", region: "Toscana", lat: 43.77, lng: 11.25, altitude_m: 530, speed_kmh: 31, heading: 80, demo: true }
 ];
-const pilotIcon = L.divIcon({ className: "pilot-marker", html: '<div class="pilot-marker-inner">✈</div>', iconSize: [34, 34], iconAnchor: [17, 17] });
+const pilotIcon = L.divIcon({ className: "pilot-marker", html: '<div class="pilot-marker-inner"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M5 17 Q24 1 43 17 Q24 11 5 17Z" fill="#f6c84b" stroke="white" stroke-width="1.8"/><path d="M8 18 Q24 13 40 18" fill="none" stroke="#fff" stroke-width="1.5"/><path d="M24 17 L24 29 M16 20 L20 31 M32 20 L28 31" stroke="white" stroke-width="1.5"/><circle cx="24" cy="31" r="3.2" fill="#fff"/><path d="M20 35 L28 35 L31 40 L17 40Z" fill="#fff" stroke="#126b59" stroke-width="1.2"/><path d="M13 33 L35 33" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/></svg></div>', iconSize: [38, 38], iconAnchor: [19, 19] });
 
 function MapView({ pilots, ownPosition }) {
   const center = ownPosition ? [ownPosition.lat, ownPosition.lng] : [42.8, 12.5];
