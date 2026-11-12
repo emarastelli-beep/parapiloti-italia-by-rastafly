@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { createClient } from "@supabase/supabase-js";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
 import { Wind, Map as MapIcon, Users, UserCircle, Plane, Square, LogOut, Shield, Mail, LocateFixed, Clock3, Gauge, Route, Menu, X } from "lucide-react";
 import "leaflet/dist/leaflet.css";
@@ -32,13 +32,14 @@ function CenterMapButton({ ownPosition }) {
   return <button className="center-map-btn" onClick={() => map.setView([ownPosition.lat, ownPosition.lng], Math.max(map.getZoom(), 15), { animate: true })} aria-label="Centra sulla mia posizione" title="Centra sulla mia posizione"><LocateFixed size={21} /><span>CENTRA</span></button>;
 }
 
-function MapView({ pilots, ownPosition }) {
+function MapView({ pilots, ownPosition, trail }) {
   const center = ownPosition ? [ownPosition.lat, ownPosition.lng] : [42.8, 12.5];
   return <MapContainer center={center} zoom={ownPosition ? 15 : 6} scrollWheelZoom className="map">
     <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
     <FollowPilot ownPosition={ownPosition} />
     <CenterMapButton ownPosition={ownPosition} />
-    {pilots.map(p => <Marker key={p.id} position={[p.lat, p.lng]} icon={pilotIcon}><Popup><b>{p.nickname}</b><br />{p.region || "Italia"}<br />{p.altitude_m ?? "—"} m · {p.speed_kmh ?? "—"} km/h{p.demo ? <><br /><small>Posizione dimostrativa</small></> : null}</Popup></Marker>)}
+    {trail.length > 1 && <Polyline positions={trail.map(p => [p.lat, p.lng])} pathOptions={{ color: "#e05b35", weight: 5, opacity: 0.9 }} />}
+    {pilots.map(p => <Marker key={p.id} position={[p.lat, p.lng]} icon={pilotIcon}><Popup><b>{p.nickname}</b><br />{p.region || "Italia"}<br />{p.altitude_m ?? "—"} m · {p.speed_kmh ?? "—"} km/h<br />Prua GPS: {p.heading == null ? "—" : Math.round(p.heading) + "° T"}{p.demo ? <><br /><small>Posizione dimostrativa</small></> : null}</Popup></Marker>)}
   </MapContainer>;
 }
 
@@ -54,6 +55,7 @@ function App() {
   const [pilots, setPilots] = useState(demoPilots);
   const [flying, setFlying] = useState(false);
   const [ownPosition, setOwnPosition] = useState(null);
+  const [trail, setTrail] = useState([]);
   const [status, setStatus] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [gpsError, setGpsError] = useState("");
@@ -97,7 +99,7 @@ function App() {
     if (window.__flightWatch != null && navigator.geolocation) navigator.geolocation.clearWatch(window.__flightWatch);
     window.__flightWatch = null;
     if (supabase) await supabase.auth.signOut();
-    setFlying(false); setOwnPosition(null);
+    setFlying(false); setOwnPosition(null); setTrail([]);
   }
 
   async function startFlight() {
@@ -106,13 +108,13 @@ function App() {
     setGpsError("");
     navigator.geolocation.getCurrentPosition(async pos => {
       const p = { lat: pos.coords.latitude, lng: pos.coords.longitude, altitude_m: pos.coords.altitude == null ? null : Math.round(pos.coords.altitude), speed_kmh: pos.coords.speed == null ? null : Math.round(pos.coords.speed * 3.6), heading: pos.coords.heading, updated_at: new Date().toISOString() };
-      setOwnPosition(p); setFlying(true); setStatus("Sessione avviata. Mantieni l'app autorizzata alla posizione.");
+      setOwnPosition(p); setTrail([{lat:p.lat,lng:p.lng,time:Date.now()}]); setFlying(true); setStatus("Sessione avviata. Mantieni l'app autorizzata alla posizione.");
       await publishPosition(p);
       const { error } = await supabase.from("flight_sessions").insert({ pilot_id: profile?.id || session.user.id });
       if (error) setStatus("Posizione inviata, ma apertura sessione non riuscita: " + error.message);
       window.__flightWatch = navigator.geolocation.watchPosition(async next => {
         const q = { lat: next.coords.latitude, lng: next.coords.longitude, altitude_m: next.coords.altitude == null ? null : Math.round(next.coords.altitude), speed_kmh: next.coords.speed == null ? null : Math.round(next.coords.speed * 3.6), heading: next.coords.heading, updated_at: new Date().toISOString() };
-        setOwnPosition(q); await publishPosition(q);
+        setOwnPosition(q); setTrail(prev => [...prev.filter(point => Date.now() - point.time <= 60000), {lat:q.lat,lng:q.lng,time:Date.now()}]); await publishPosition(q);
       }, err => setGpsError(err.message), { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
     }, err => setGpsError(err.message), { enableHighAccuracy: true, timeout: 20000 });
   }
@@ -155,7 +157,7 @@ function App() {
       <div className="content-grid">
         <section className="main-panel">
           {tab === "map" && <><div className="panel-heading"><div><div className="eyebrow dark">LIVE TRACKING</div><h2>Mappa dei piloti</h2><p>Le posizioni reali sono visibili solo agli utenti autenticati.</p></div><span className="live-pill"><i></i> LIVE</span></div>
-            <div className="map-wrap"><MapView key={flying ? "flight-map" : "normal-map"} pilots={pilots} ownPosition={ownPosition} /><div className="map-legend"><span><i className="legend-dot green"></i> Piloti attivi</span><span><i className="legend-dot blue"></i> La tua posizione</span></div></div>
+            <div className="map-wrap"><MapView key={flying ? "flight-map" : "normal-map"} pilots={pilots} ownPosition={ownPosition} trail={trail} /><div className="map-legend"><span><i className="legend-dot green"></i> Piloti attivi</span><span><i className="legend-dot blue"></i> La tua posizione</span></div></div>
             <div className="flight-control"><div><b>{flying ? "Sessione di volo attiva" : "Pronto al decollo?"}</b><span>{flying ? "La posizione viene condivisa con gli iscritti." : "Avvia la condivisione quando sei pronto."}</span></div><button className={flying ? "danger-btn" : "primary-btn"} onClick={flying ? stopFlight : startFlight}>{flying ? <Square size={17} /> : <Plane size={17} />} {flying ? "Termina volo" : "Avvia il mio volo"}</button></div>
             {gpsError && <div className="notice error">{gpsError}</div>}
           </>}
