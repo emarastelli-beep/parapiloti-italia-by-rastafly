@@ -263,7 +263,8 @@ function App() {
       <nav className={menuOpen ? "nav open" : "nav"}>
         <button className={tab === "map" ? "nav-active" : ""} onClick={() => { setTab("map"); setMenuOpen(false); }}><MapIcon size={17} /> Mappa</button>
         <button className={tab === "pilots" ? "nav-active" : ""} onClick={() => { setTab("pilots"); setMenuOpen(false); }}><Users size={17} /> Piloti</button>
-        <button className={tab === "profile" ? "nav-active" : ""} onClick={() => { setTab("profile"); setMenuOpen(false); }}><UserCircle size={17} /> Profilo</button>\n        <button className={tab === "logbook" ? "nav-active" : ""} onClick={() => { setTab("logbook"); setMenuOpen(false); loadLogbook(); }}><BookOpen size={17} /> Logbook</button>
+        <button className={tab === "profile" ? "nav-active" : ""} onClick={() => { setTab("profile"); setMenuOpen(false); }}><UserCircle size={17} /> Profilo</button>
+        <button className={tab === "logbook" ? "nav-active" : ""} onClick={() => { setTab("logbook"); setMenuOpen(false); loadLogbook(); }}><BookOpen size={17} /> Logbook</button>
       </nav>
       <div className="header-right">{session ? <><span className="signed-in">{profile?.nickname || session.user.email}</span><button className="icon-btn" onClick={logout} title="Esci"><LogOut size={18} /></button></> : <button className="small-primary" onClick={() => setTab("profile")}>Accedi</button>}</div>
     </header>
