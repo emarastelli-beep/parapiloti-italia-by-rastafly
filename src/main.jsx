@@ -23,7 +23,6 @@ function MapView({ pilots, ownPosition }) {
   return <MapContainer center={center} zoom={ownPosition ? 9 : 6} scrollWheelZoom className="map">
     <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
     {pilots.map(p => <Marker key={p.id} position={[p.lat, p.lng]} icon={pilotIcon}><Popup><b>{p.nickname}</b><br />{p.region || "Italia"}<br />{p.altitude_m ?? "—"} m · {p.speed_kmh ?? "—"} km/h{p.demo ? <><br /><small>Posizione dimostrativa</small></> : null}</Popup></Marker>)}
-    {ownPosition && <Marker position={[ownPosition.lat, ownPosition.lng]}><Popup>La tua posizione GPS</Popup></Marker>}
   </MapContainer>;
 }
 
