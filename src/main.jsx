@@ -121,7 +121,7 @@ function App() {
   }
 
   const activePilots = pilots.filter(p => !p.demo).length;
-  return <div className="app-shell">
+  return <div className={flying ? "app-shell flight-mode" : "app-shell"}>
     <header className="topbar">
       <div className="brand"><div className="brand-mark"><Wind size={22} /></div><div><strong>ParaPiloti</strong><span>IN VOLO ITALIA</span></div></div>
       <button className="icon-btn mobile-menu" onClick={() => setMenuOpen(!menuOpen)} aria-label="Menu">{menuOpen ? <X /> : <Menu />}</button>
@@ -140,7 +140,7 @@ function App() {
       <div className="content-grid">
         <section className="main-panel">
           {tab === "map" && <><div className="panel-heading"><div><div className="eyebrow dark">LIVE TRACKING</div><h2>Mappa dei piloti</h2><p>Le posizioni reali sono visibili solo agli utenti autenticati.</p></div><span className="live-pill"><i></i> LIVE</span></div>
-            <div className="map-wrap"><MapView pilots={pilots} ownPosition={ownPosition} /><div className="map-legend"><span><i className="legend-dot green"></i> Piloti attivi</span><span><i className="legend-dot blue"></i> La tua posizione</span></div></div>
+            <div className="map-wrap"><MapView key={flying ? "flight-map" : "normal-map"} pilots={pilots} ownPosition={ownPosition} /><div className="map-legend"><span><i className="legend-dot green"></i> Piloti attivi</span><span><i className="legend-dot blue"></i> La tua posizione</span></div></div>
             <div className="flight-control"><div><b>{flying ? "Sessione di volo attiva" : "Pronto al decollo?"}</b><span>{flying ? "La posizione viene condivisa con gli iscritti." : "Avvia la condivisione quando sei pronto."}</span></div><button className={flying ? "danger-btn" : "primary-btn"} onClick={flying ? stopFlight : startFlight}>{flying ? <Square size={17} /> : <Plane size={17} />} {flying ? "Termina volo" : "Avvia il mio volo"}</button></div>
             {gpsError && <div className="notice error">{gpsError}</div>}
           </>}
