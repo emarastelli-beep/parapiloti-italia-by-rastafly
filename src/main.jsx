@@ -169,6 +169,7 @@ function App() {
       const activeFlightId = flightSession.id;
       setCurrentFlightId(activeFlightId);
       await supabase.from("flight_track_points").insert({ flight_session_id: activeFlightId, pilot_id: session.user.id, lat: p.lat, lng: p.lng });
+      window.__lastSavedTrackPoint = { lat: p.lat, lng: p.lng, time: Date.now() };
       window.__flightWatch = navigator.geolocation.watchPosition(async next => {
         const q = { lat: next.coords.latitude, lng: next.coords.longitude, altitude_m: next.coords.altitude == null ? null : Math.round(next.coords.altitude), speed_kmh: next.coords.speed == null ? null : Math.round(next.coords.speed * 3.6), heading: next.coords.heading, accuracy_m: next.coords.accuracy, updated_at: new Date().toISOString() };
         setOwnPosition(q);
@@ -191,8 +192,15 @@ function App() {
           return [...recent, {lat:q.lat,lng:q.lng,time:now}];
         });
         const accuracyOk = next.coords.accuracy <= 35;
-        if (accuracyOk && (next.coords.speed == null || next.coords.speed >= 1.5)) {
-          await supabase.from("flight_track_points").insert({ flight_session_id: activeFlightId, pilot_id: session.user.id, lat: q.lat, lng: q.lng });
+        const lastSaved = window.__lastSavedTrackPoint;
+        const radSaved = Math.PI / 180;
+        const dLatSaved = lastSaved ? (q.lat - lastSaved.lat) * 111320 : 0;
+        const dLngSaved = lastSaved ? (q.lng - lastSaved.lng) * 111320 * Math.cos(lastSaved.lat * radSaved) : 0;
+        const movedMeters = Math.hypot(dLatSaved, dLngSaved);
+        const moving = next.coords.speed != null ? next.coords.speed >= 1.5 : movedMeters >= 15;
+        if (accuracyOk && moving && movedMeters >= 5) {
+          const { error: pointError } = await supabase.from("flight_track_points").insert({ flight_session_id: activeFlightId, pilot_id: session.user.id, lat: q.lat, lng: q.lng });
+          if (!pointError) window.__lastSavedTrackPoint = { lat: q.lat, lng: q.lng, time: Date.now() };
         }
         await publishPosition(q);
       }, err => setGpsError(err.message), { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
@@ -208,7 +216,7 @@ function App() {
 
   async function stopFlight() {
     if (window.__flightWatch != null && navigator.geolocation) navigator.geolocation.clearWatch(window.__flightWatch);
-    window.__flightWatch = null; setFlying(false); setOwnPosition(null);
+    window.__flightWatch = null; window.__lastSavedTrackPoint = null; setFlying(false); setOwnPosition(null);
     if (supabase && session) {
       await supabase.from("live_positions").delete().eq("user_id", session.user.id);
       if (currentFlightId) await supabase.from("flight_sessions").update({ ended_at: new Date().toISOString() }).eq("id", currentFlightId).eq("pilot_id", session.user.id);
