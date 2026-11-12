@@ -1,0 +1,10 @@
+{
+  "name": "ParaPiloti in volo Italia",
+  "short_name": "ParaPiloti",
+  "description": "Community italiana dei piloti di paramotore",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f7f8",
+  "theme_color": "#10283b",
+  "icons": []
+}
