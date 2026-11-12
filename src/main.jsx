@@ -29,7 +29,7 @@ function FollowPilot({ ownPosition }) {
 function CenterMapButton({ ownPosition }) {
   const map = useMap();
   if (!ownPosition) return null;
-  return <button className="center-map-btn" onClick={() => map.setView([ownPosition.lat, ownPosition.lng], Math.max(map.getZoom(), 15), { animate: true })} aria-label="Centra sulla mia posizione" title="Centra sulla mia posizione"><LocateFixed size={22} /></button>;
+  return <button className="center-map-btn" onClick={() => map.setView([ownPosition.lat, ownPosition.lng], Math.max(map.getZoom(), 15), { animate: true })} aria-label="Centra sulla mia posizione" title="Centra sulla mia posizione"><LocateFixed size={21} /><span>CENTRA</span></button>;
 }
 
 function MapView({ pilots, ownPosition }) {
