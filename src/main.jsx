@@ -140,7 +140,7 @@ function App() {
   const activePilots = pilots.filter(p => !p.demo).length;
   return <div className={flying ? "app-shell flight-mode" : "app-shell"}>
     <header className="topbar">
-      <div className="brand"><div className="brand-mark"><Wind size={22} /></div><div><strong>ParaPiloti</strong><span>IN VOLO ITALIA</span></div></div>
+      <div className="brand"><div className="brand-mark"><Wind size={22} /></div><div><strong>ParaPiloti</strong><span>IN VOLO ITALIA</span><small className="brand-creator">BY RASTA7212</small></div></div>
       <button className="icon-btn mobile-menu" onClick={() => setMenuOpen(!menuOpen)} aria-label="Menu">{menuOpen ? <X /> : <Menu />}</button>
       <nav className={menuOpen ? "nav open" : "nav"}>
         <button className={tab === "map" ? "nav-active" : ""} onClick={() => { setTab("map"); setMenuOpen(false); }}><MapIcon size={17} /> Mappa</button>
