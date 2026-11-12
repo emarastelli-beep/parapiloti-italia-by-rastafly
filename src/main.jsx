@@ -38,7 +38,16 @@ function MapView({ pilots, ownPosition, trail }) {
     <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
     <FollowPilot ownPosition={ownPosition} />
     <CenterMapButton ownPosition={ownPosition} />
-    {trail.length > 1 && <Polyline positions={trail.map(p => [p.lat, p.lng])} pathOptions={{ color: "#e05b35", weight: 5, opacity: 0.9 }} />}
+    {trail.length > 1 && <Polyline positions={trail.map(p => [p.lat, p.lng])} pathOptions={{ color: "#e05b35", weight: 2.5, opacity: 0.95, dashArray: "5 8", lineCap: "round" }} />}
+    {ownPosition?.heading != null && Number.isFinite(Number(ownPosition.heading)) && (() => {
+      const bearing = Number(ownPosition.heading) * Math.PI / 180;
+      const distance = 85;
+      const dLat = distance * Math.cos(bearing) / 111320;
+      const dLng = distance * Math.sin(bearing) / (111320 * Math.cos(ownPosition.lat * Math.PI / 180));
+      const tip = [ownPosition.lat + dLat, ownPosition.lng + dLng];
+      const arrowIcon = L.divIcon({ className: "heading-vector-icon", iconSize: [30, 30], iconAnchor: [15, 15], html: '<svg viewBox="0 0 30 30" width="30" height="30" xmlns="http://www.w3.org/2000/svg"><path d="M15 27 L15 5 M6 14 L15 4 L24 14" fill="none" stroke="#e05b35" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>' });
+      return <><Polyline positions={[[ownPosition.lat, ownPosition.lng], tip]} pathOptions={{ color: "#e05b35", weight: 3, opacity: 1, lineCap: "round" }} /><Marker position={tip} icon={arrowIcon} interactive={false} /></>;
+    })()}
     {pilots.map(p => <Marker key={p.id} position={[p.lat, p.lng]} icon={pilotIcon}><Tooltip permanent direction="top" offset={[0, -30]} opacity={1} className="pilot-name-label">{p.nickname || "Pilota"}</Tooltip><Popup><b>{p.nickname}</b><br />{p.region || "Italia"}<br />{p.altitude_m ?? "—"} m · {p.speed_kmh ?? "—"} km/h<br />Prua GPS: {p.heading == null ? "—" : Math.round(p.heading) + "° T"}{p.demo ? <><br /><small>Posizione dimostrativa</small></> : null}</Popup></Marker>)}
   </MapContainer>;
 }
