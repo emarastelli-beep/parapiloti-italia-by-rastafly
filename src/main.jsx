@@ -58,12 +58,101 @@ function App() {
     refreshPilots();
   }, [session]);
 
+  useEffect(() => {
+    if (!session || !supabase || !navigator.geolocation) return;
+    let flyingNow = false;
+    let lowSpeedSince = null;
+    let samples = [];
+    let starting = false;
+
+    const watchId = navigator.geolocation.watchPosition(async pos => {
+      const now = Date.now();
+      const coords = pos.coords;
+      const p = {
+        lat: coords.latitude,
+        lng: coords.longitude,
+        altitude_m: coords.altitude == null ? null : Math.round(coords.altitude),
+        speed_kmh: coords.speed == null ? null : Math.round(coords.speed * 3.6),
+        heading: coords.heading,
+        updated_at: new Date(now).toISOString()
+      };
+
+      samples.push({
+        time: now,
+        altitude: coords.altitude,
+        speed: coords.speed == null ? null : coords.speed * 3.6,
+        altitudeAccuracy: coords.altitudeAccuracy
+      });
+      samples = samples.filter(s => now - s.time <= 100000);
+
+      if (!flyingNow) {
+        const recent = samples.filter(s => now - s.time <= 25000);
+        const moving = recent.filter(s => s.speed != null && s.speed >= 8);
+        const first = recent[0];
+        const last = recent[recent.length - 1];
+        const hasClimb = first && last && first.altitude != null && last.altitude != null
+          && last.altitude - first.altitude >= 8
+          && (last.altitudeAccuracy == null || last.altitudeAccuracy <= 20);
+        if (!starting && moving.length >= 3 && hasClimb) {
+          starting = true;
+          flyingNow = true;
+          setOwnPosition(p);
+          setFlying(true);
+          setStatus("Decollo rilevato automaticamente. Volo in registrazione.");
+          await publishPosition(p);
+          const { error } = await supabase.from("flight_sessions").insert({ user_id: session.user.id });
+          if (error) setStatus("Volo rilevato, ma apertura sessione non riuscita: " + error.message);
+          starting = false;
+        }
+        return;
+      }
+
+      setOwnPosition(p);
+      await publishPosition(p);
+
+      if (coords.speed != null && coords.speed * 3.6 <= 3 && coords.altitude != null) {
+        if (lowSpeedSince == null) lowSpeedSince = now;
+        const lowSamples = samples.filter(s => now - s.time <= 60000 && s.altitude != null);
+        if (now - lowSpeedSince >= 60000 && lowSamples.length >= 3) {
+          const heights = lowSamples.map(s => s.altitude);
+          const altitudeRange = Math.max(...heights) - Math.min(...heights);
+          if (altitudeRange <= 8) {
+            flyingNow = false;
+            lowSpeedSince = null;
+            setFlying(false);
+            setOwnPosition(null);
+            await supabase.from("live_positions").delete().eq("user_id", session.user.id);
+            await supabase.from("flight_sessions").update({ ended_at: new Date().toISOString() })
+              .eq("user_id", session.user.id).is("ended_at", null);
+            setStatus("Atterraggio rilevato automaticamente. Volo terminato.");
+            samples = [];
+            refreshPilots();
+          }
+        }
+      } else {
+        lowSpeedSince = null;
+      }
+    }, err => setGpsError("GPS: " + err.message), {
+      enableHighAccuracy: true,
+      maximumAge: 3000,
+      timeout: 20000
+    });
+
+    window.__flightWatch = watchId;
+    setGpsError("");
+    setStatus("Rilevamento automatico attivo. Tieni aperta l'app e consenti l'accesso alla posizione.");
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+      if (window.__flightWatch === watchId) window.__flightWatch = null;
+    };
+  }, [session]);
+
   async function refreshPilots() {
     if (!supabase) return;
     const cutoff = new Date(Date.now() - 2 * 60 * 1000).toISOString();
-    const { data, error } = await supabase.from("live_positions").select("user_id,lat,lng,altitude_m,speed_kmh,heading,updated_at,profiles(nickname,region)").gte("updated_at", cutoff);
+    const { data, error } = await supabase.from("live_positions").select("user_id,latitude,longitude,altitude_m,speed_kmh,heading,updated_at,profiles(nickname,region)").gte("updated_at", cutoff);
     if (error) { setStatus(error.message); return; }
-    setPilots((data || []).map(p => ({ id: p.user_id, lat: p.lat, lng: p.lng, altitude_m: p.altitude_m, speed_kmh: p.speed_kmh, heading: p.heading, nickname: p.profiles?.nickname || "Pilota", region: p.profiles?.region })));
+    setPilots((data || []).map(p => ({ id: p.user_id, lat: p.latitude, lng: p.longitude, altitude_m: p.altitude_m, speed_kmh: p.speed_kmh, heading: p.heading, nickname: p.profiles?.nickname || "Pilota", region: p.profiles?.region })));
   }
 
   async function handleAuth(e) {
@@ -104,7 +193,7 @@ function App() {
 
   async function publishPosition(p) {
     if (!supabase || !session) return;
-    const { error } = await supabase.from("live_positions").upsert({ user_id: session.user.id, ...p, is_flying: true });
+    const { error } = await supabase.from("live_positions").upsert({ user_id: session.user.id, latitude: p.lat, longitude: p.lng, altitude_m: p.altitude_m, speed_kmh: p.speed_kmh, heading: p.heading, updated_at: p.updated_at });
     if (error) setStatus("Errore invio posizione: " + error.message);
     else refreshPilots();
   }
@@ -141,7 +230,7 @@ function App() {
         <section className="main-panel">
           {tab === "map" && <><div className="panel-heading"><div><div className="eyebrow dark">LIVE TRACKING</div><h2>Mappa dei piloti</h2><p>Le posizioni reali sono visibili solo agli utenti autenticati.</p></div><span className="live-pill"><i></i> LIVE</span></div>
             <div className="map-wrap"><MapView pilots={pilots} ownPosition={ownPosition} /><div className="map-legend"><span><i className="legend-dot green"></i> Piloti attivi</span><span><i className="legend-dot blue"></i> La tua posizione</span></div></div>
-            <div className="flight-control"><div><b>{flying ? "Sessione di volo attiva" : "Pronto al decollo?"}</b><span>{flying ? "La posizione viene condivisa con gli iscritti." : "Avvia la condivisione quando sei pronto."}</span></div><button className={flying ? "danger-btn" : "primary-btn"} onClick={flying ? stopFlight : startFlight}>{flying ? <Square size={17} /> : <Plane size={17} />} {flying ? "Termina volo" : "Avvia il mio volo"}</button></div>
+            <div className="flight-control"><div><b>{flying ? "Sessione di volo attiva" : "Rilevamento automatico"}</b><span>{flying ? "Decollo rilevato: posizione condivisa con gli iscritti." : session ? "GPS in monitoraggio: il volo partirà al rilevamento di corsa e salita." : "Accedi per attivare il rilevamento automatico."}</span></div><span className="live-pill"><i></i> {flying ? "IN VOLO" : "AUTO"}</span></div>
             {gpsError && <div className="notice error">{gpsError}</div>}
           </>}
           {tab === "pilots" && <><div className="panel-heading"><div><div className="eyebrow dark">COMMUNITY</div><h2>Piloti in volo</h2><p>Elenco delle posizioni aggiornate di recente.</p></div><Users /></div>{pilots.map(p => <div className="pilot-row" key={p.id}><div className="avatar">{p.nickname?.slice(0, 1)?.toUpperCase() || "P"}</div><div className="pilot-info"><b>{p.nickname}</b><span>{p.region || "Italia"} · {p.demo ? "Posizione demo" : "In volo"}</span></div><div className="pilot-data"><b>{p.altitude_m ?? "—"} m</b><span>{p.speed_kmh ?? "—"} km/h</span></div><span className="status-dot"></span></div>)}</>}
