@@ -61,9 +61,9 @@ function App() {
   async function refreshPilots() {
     if (!supabase) return;
     const cutoff = new Date(Date.now() - 2 * 60 * 1000).toISOString();
-    const { data, error } = await supabase.from("live_positions").select("user_id,lat,lng,altitude_m,speed_kmh,heading,updated_at,profiles(nickname,region)").gte("updated_at", cutoff);
+    const { data, error } = await supabase.from("live_positions").select("user_id,latitude,longitude,altitude_m,speed_kmh,heading,updated_at,profiles(nickname,region)").gte("updated_at", cutoff);
     if (error) { setStatus(error.message); return; }
-    setPilots((data || []).map(p => ({ id: p.user_id, lat: p.lat, lng: p.lng, altitude_m: p.altitude_m, speed_kmh: p.speed_kmh, heading: p.heading, nickname: p.profiles?.nickname || "Pilota", region: p.profiles?.region })));
+    setPilots((data || []).map(p => ({ id: p.user_id, lat: p.latitude, lng: p.longitude, altitude_m: p.altitude_m, speed_kmh: p.speed_kmh, heading: p.heading, nickname: p.profiles?.nickname || "Pilota", region: p.profiles?.region })));
   }
 
   async function handleAuth(e) {
@@ -104,7 +104,7 @@ function App() {
 
   async function publishPosition(p) {
     if (!supabase || !session) return;
-    const { error } = await supabase.from("live_positions").upsert({ user_id: session.user.id, ...p, is_flying: true });
+    const { error } = await supabase.from("live_positions").upsert({ user_id: session.user.id, latitude: p.lat, longitude: p.lng, altitude_m: p.altitude_m, speed_kmh: p.speed_kmh, heading: p.heading, updated_at: p.updated_at, is_flying: true });
     if (error) setStatus("Errore invio posizione: " + error.message);
     else refreshPilots();
   }
