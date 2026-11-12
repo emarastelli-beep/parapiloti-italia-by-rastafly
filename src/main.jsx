@@ -38,7 +38,7 @@ function MapView({ pilots, ownPosition, trail }) {
     <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
     <FollowPilot ownPosition={ownPosition} />
     <CenterMapButton ownPosition={ownPosition} />
-    {trail.length > 1 && <Polyline positions={trail.map(p => [p.lat, p.lng])} pathOptions={{ color: "#e05b35", weight: 2.5, opacity: 0.95, dashArray: "5 8", lineCap: "round" }} />}
+    {trail.length > 1 && <Polyline positions={trail.map(p => [p.lat, p.lng])} pathOptions={{ color: "#e05b35", weight: 3, opacity: 0.95, lineCap: "round", lineJoin: "round" }} />}
     {ownPosition?.heading != null && Number.isFinite(Number(ownPosition.heading)) && (() => {
       const bearing = Number(ownPosition.heading) * Math.PI / 180;
       const distance = 85;
@@ -124,7 +124,7 @@ function App() {
       window.__flightWatch = navigator.geolocation.watchPosition(async next => {
         const q = { lat: next.coords.latitude, lng: next.coords.longitude, altitude_m: next.coords.altitude == null ? null : Math.round(next.coords.altitude), speed_kmh: next.coords.speed == null ? null : Math.round(next.coords.speed * 3.6), heading: next.coords.heading, updated_at: new Date().toISOString() };
         setOwnPosition(q); setTrail(prev => [...prev.filter(point => Date.now() - point.time <= 60000), {lat:q.lat,lng:q.lng,time:Date.now()}]); await publishPosition(q);
-      }, err => setGpsError(err.message), { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
+      }, err => setGpsError(err.message), { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
     }, err => setGpsError(err.message), { enableHighAccuracy: true, timeout: 20000 });
   }
 
