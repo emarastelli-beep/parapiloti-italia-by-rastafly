@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { createClient } from "@supabase/supabase-js";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import { Wind, Map as MapIcon, Users, UserCircle, Plane, Square, LogOut, Shield, Mail, LocateFixed, Clock3, Gauge, Route, Menu, X } from "lucide-react";
 import "leaflet/dist/leaflet.css";
@@ -18,10 +18,26 @@ const demoPilots = [
 ];
 const pilotIcon = L.divIcon({ className: "pilot-marker", html: '<div class="pilot-marker-inner"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M5 17 Q24 1 43 17 Q24 11 5 17Z" fill="#f6c84b" stroke="white" stroke-width="1.8"/><path d="M8 18 Q24 13 40 18" fill="none" stroke="#fff" stroke-width="1.5"/><path d="M24 17 L24 29 M16 20 L20 31 M32 20 L28 31" stroke="white" stroke-width="1.5"/><circle cx="24" cy="31" r="3.2" fill="#fff"/><path d="M20 35 L28 35 L31 40 L17 40Z" fill="#fff" stroke="#126b59" stroke-width="1.2"/><path d="M13 33 L35 33" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/></svg></div>', iconSize: [38, 38], iconAnchor: [19, 19] });
 
+function FollowPilot({ ownPosition }) {
+  const map = useMap();
+  useEffect(() => {
+    if (ownPosition) map.setView([ownPosition.lat, ownPosition.lng], map.getZoom(), { animate: true, duration: 0.5 });
+  }, [ownPosition?.lat, ownPosition?.lng, map]);
+  return null;
+}
+
+function CenterMapButton({ ownPosition }) {
+  const map = useMap();
+  if (!ownPosition) return null;
+  return <button className="center-map-btn" onClick={() => map.setView([ownPosition.lat, ownPosition.lng], Math.max(map.getZoom(), 15), { animate: true })} aria-label="Centra sulla mia posizione" title="Centra sulla mia posizione"><LocateFixed size={22} /></button>;
+}
+
 function MapView({ pilots, ownPosition }) {
   const center = ownPosition ? [ownPosition.lat, ownPosition.lng] : [42.8, 12.5];
-  return <MapContainer center={center} zoom={ownPosition ? 9 : 6} scrollWheelZoom className="map">
+  return <MapContainer center={center} zoom={ownPosition ? 15 : 6} scrollWheelZoom className="map">
     <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+    <FollowPilot ownPosition={ownPosition} />
+    <CenterMapButton ownPosition={ownPosition} />
     {pilots.map(p => <Marker key={p.id} position={[p.lat, p.lng]} icon={pilotIcon}><Popup><b>{p.nickname}</b><br />{p.region || "Italia"}<br />{p.altitude_m ?? "—"} m · {p.speed_kmh ?? "—"} km/h{p.demo ? <><br /><small>Posizione dimostrativa</small></> : null}</Popup></Marker>)}
   </MapContainer>;
 }
