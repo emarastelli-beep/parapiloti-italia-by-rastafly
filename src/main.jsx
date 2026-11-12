@@ -93,7 +93,7 @@ function App() {
       const p = { lat: pos.coords.latitude, lng: pos.coords.longitude, altitude_m: pos.coords.altitude == null ? null : Math.round(pos.coords.altitude), speed_kmh: pos.coords.speed == null ? null : Math.round(pos.coords.speed * 3.6), heading: pos.coords.heading, updated_at: new Date().toISOString() };
       setOwnPosition(p); setFlying(true); setStatus("Sessione avviata. Mantieni l'app autorizzata alla posizione.");
       await publishPosition(p);
-      const { error } = await supabase.from("flight_sessions").insert({ user_id: session.user.id });
+      const { error } = await supabase.from("flight_sessions").insert({ pilot_id: profile?.id || session.user.id });
       if (error) setStatus("Posizione inviata, ma apertura sessione non riuscita: " + error.message);
       window.__flightWatch = navigator.geolocation.watchPosition(async next => {
         const q = { lat: next.coords.latitude, lng: next.coords.longitude, altitude_m: next.coords.altitude == null ? null : Math.round(next.coords.altitude), speed_kmh: next.coords.speed == null ? null : Math.round(next.coords.speed * 3.6), heading: next.coords.heading, updated_at: new Date().toISOString() };
@@ -114,7 +114,7 @@ function App() {
     window.__flightWatch = null; setFlying(false); setOwnPosition(null);
     if (supabase && session) {
       await supabase.from("live_positions").delete().eq("user_id", session.user.id);
-      await supabase.from("flight_sessions").update({ ended_at: new Date().toISOString() }).eq("user_id", session.user.id).is("ended_at", null);
+      await supabase.from("flight_sessions").update({ ended_at: new Date().toISOString() }).eq("pilot_id", profile?.id || session.user.id).is("ended_at", null);
     }
     setStatus("Volo terminato. La tua posizione non è più visibile sulla mappa.");
     refreshPilots();
