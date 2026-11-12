@@ -16,14 +16,13 @@ const demoPilots = [
   { id: "demo-2", nickname: "SkyLombardia", region: "Lombardia", lat: 45.62, lng: 9.82, altitude_m: 610, speed_kmh: 28, heading: 205, demo: true },
   { id: "demo-3", nickname: "TuscanyFly", region: "Toscana", lat: 43.77, lng: 11.25, altitude_m: 530, speed_kmh: 31, heading: 80, demo: true }
 ];
-const pilotIcon = L.divIcon({ className: "pilot-marker", html: '<div class="pilot-marker-inner">✈</div>', iconSize: [34, 34], iconAnchor: [17, 17] });
+const pilotIcon = L.divIcon({ className: "pilot-marker", html: '<div class="pilot-marker-inner"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M5 17 Q24 1 43 17 Q24 11 5 17Z" fill="#f6c84b" stroke="white" stroke-width="1.8"/><path d="M8 18 Q24 13 40 18" fill="none" stroke="#fff" stroke-width="1.5"/><path d="M24 17 L24 29 M16 20 L20 31 M32 20 L28 31" stroke="white" stroke-width="1.5"/><circle cx="24" cy="31" r="3.2" fill="#fff"/><path d="M20 35 L28 35 L31 40 L17 40Z" fill="#fff" stroke="#126b59" stroke-width="1.2"/><path d="M13 33 L35 33" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/></svg></div>', iconSize: [38, 38], iconAnchor: [19, 19] });
 
 function MapView({ pilots, ownPosition }) {
   const center = ownPosition ? [ownPosition.lat, ownPosition.lng] : [42.8, 12.5];
   return <MapContainer center={center} zoom={ownPosition ? 9 : 6} scrollWheelZoom className="map">
     <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
     {pilots.map(p => <Marker key={p.id} position={[p.lat, p.lng]} icon={pilotIcon}><Popup><b>{p.nickname}</b><br />{p.region || "Italia"}<br />{p.altitude_m ?? "—"} m · {p.speed_kmh ?? "—"} km/h{p.demo ? <><br /><small>Posizione dimostrativa</small></> : null}</Popup></Marker>)}
-    {ownPosition && <Marker position={[ownPosition.lat, ownPosition.lng]}><Popup>La tua posizione GPS</Popup></Marker>}
   </MapContainer>;
 }
 
@@ -93,7 +92,7 @@ function App() {
       const p = { lat: pos.coords.latitude, lng: pos.coords.longitude, altitude_m: pos.coords.altitude == null ? null : Math.round(pos.coords.altitude), speed_kmh: pos.coords.speed == null ? null : Math.round(pos.coords.speed * 3.6), heading: pos.coords.heading, updated_at: new Date().toISOString() };
       setOwnPosition(p); setFlying(true); setStatus("Sessione avviata. Mantieni l'app autorizzata alla posizione.");
       await publishPosition(p);
-      const { error } = await supabase.from("flight_sessions").insert({ user_id: session.user.id });
+      const { error } = await supabase.from("flight_sessions").insert({ pilot_id: profile?.id || session.user.id });
       if (error) setStatus("Posizione inviata, ma apertura sessione non riuscita: " + error.message);
       window.__flightWatch = navigator.geolocation.watchPosition(async next => {
         const q = { lat: next.coords.latitude, lng: next.coords.longitude, altitude_m: next.coords.altitude == null ? null : Math.round(next.coords.altitude), speed_kmh: next.coords.speed == null ? null : Math.round(next.coords.speed * 3.6), heading: next.coords.heading, updated_at: new Date().toISOString() };
@@ -104,7 +103,7 @@ function App() {
 
   async function publishPosition(p) {
     if (!supabase || !session) return;
-    const { error } = await supabase.from("live_positions").upsert({ user_id: session.user.id, latitude: p.lat, longitude: p.lng, altitude_m: p.altitude_m, speed_kmh: p.speed_kmh, heading: p.heading, updated_at: p.updated_at, is_flying: true });
+    const { error } = await supabase.from("live_positions").upsert({ pilot_id: profile?.id || session.user.id, user_id: session.user.id, latitude: p.lat, longitude: p.lng, altitude_m: p.altitude_m, speed_kmh: p.speed_kmh, heading: p.heading, updated_at: p.updated_at }, { onConflict: "pilot_id" });
     if (error) setStatus("Errore invio posizione: " + error.message);
     else refreshPilots();
   }
@@ -114,14 +113,14 @@ function App() {
     window.__flightWatch = null; setFlying(false); setOwnPosition(null);
     if (supabase && session) {
       await supabase.from("live_positions").delete().eq("user_id", session.user.id);
-      await supabase.from("flight_sessions").update({ ended_at: new Date().toISOString() }).eq("user_id", session.user.id).is("ended_at", null);
+      await supabase.from("flight_sessions").update({ ended_at: new Date().toISOString() }).eq("pilot_id", profile?.id || session.user.id).is("ended_at", null);
     }
     setStatus("Volo terminato. La tua posizione non è più visibile sulla mappa.");
     refreshPilots();
   }
 
   const activePilots = pilots.filter(p => !p.demo).length;
-  return <div className="app-shell">
+  return <div className={flying ? "app-shell flight-mode" : "app-shell"}>
     <header className="topbar">
       <div className="brand"><div className="brand-mark"><Wind size={22} /></div><div><strong>ParaPiloti</strong><span>IN VOLO ITALIA</span></div></div>
       <button className="icon-btn mobile-menu" onClick={() => setMenuOpen(!menuOpen)} aria-label="Menu">{menuOpen ? <X /> : <Menu />}</button>
@@ -140,7 +139,7 @@ function App() {
       <div className="content-grid">
         <section className="main-panel">
           {tab === "map" && <><div className="panel-heading"><div><div className="eyebrow dark">LIVE TRACKING</div><h2>Mappa dei piloti</h2><p>Le posizioni reali sono visibili solo agli utenti autenticati.</p></div><span className="live-pill"><i></i> LIVE</span></div>
-            <div className="map-wrap"><MapView pilots={pilots} ownPosition={ownPosition} /><div className="map-legend"><span><i className="legend-dot green"></i> Piloti attivi</span><span><i className="legend-dot blue"></i> La tua posizione</span></div></div>
+            <div className="map-wrap"><MapView key={flying ? "flight-map" : "normal-map"} pilots={pilots} ownPosition={ownPosition} /><div className="map-legend"><span><i className="legend-dot green"></i> Piloti attivi</span><span><i className="legend-dot blue"></i> La tua posizione</span></div></div>
             <div className="flight-control"><div><b>{flying ? "Sessione di volo attiva" : "Pronto al decollo?"}</b><span>{flying ? "La posizione viene condivisa con gli iscritti." : "Avvia la condivisione quando sei pronto."}</span></div><button className={flying ? "danger-btn" : "primary-btn"} onClick={flying ? stopFlight : startFlight}>{flying ? <Square size={17} /> : <Plane size={17} />} {flying ? "Termina volo" : "Avvia il mio volo"}</button></div>
             {gpsError && <div className="notice error">{gpsError}</div>}
           </>}
