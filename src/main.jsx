@@ -140,7 +140,7 @@ function App() {
   const activePilots = pilots.filter(p => !p.demo).length;
   return <div className={flying ? "app-shell flight-mode" : "app-shell"}>
     <header className="topbar">
-      <div className="brand"><div className="brand-mark"><Wind size={22} /></div><div><strong>ParaPiloti</strong><span>IN VOLO ITALIA</span><small className="brand-creator">BY RASTA7212</small></div></div>
+      <div className="brand"><div className="brand-mark" aria-label="Orizzonte artificiale"><svg viewBox="0 0 64 64" role="img" aria-hidden="true"><circle cx="32" cy="32" r="27" fill="#10283b" stroke="#dce8ee" strokeWidth="2.5"/><path d="M8 32a24 24 0 0 1 48 0" fill="#55a9d6"/><path d="M8 32a24 24 0 0 0 48 0" fill="#c58b45"/><path d="M8 32h48" stroke="#f4f7f9" strokeWidth="2.5"/><path d="M20 22h7m10 0h7M24 27h5m6 0h5M20 42h7m10 0h7" stroke="#f4f7f9" strokeWidth="2" strokeLinecap="round"/><path d="M17 32h11l4-4 4 4h11" fill="none" stroke="#fff" strokeWidth="3" strokeLinejoin="round"/></svg></div><div className="brand-wordmark"><strong>ParaPiloti <span>Italia</span></strong><small className="brand-creator">BY RASTA7212</small></div></div>
       <button className="icon-btn mobile-menu" onClick={() => setMenuOpen(!menuOpen)} aria-label="Menu">{menuOpen ? <X /> : <Menu />}</button>
       <nav className={menuOpen ? "nav open" : "nav"}>
         <button className={tab === "map" ? "nav-active" : ""} onClick={() => { setTab("map"); setMenuOpen(false); }}><MapIcon size={17} /> Mappa</button>
