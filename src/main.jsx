@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { createClient } from "@supabase/supabase-js";
 import { MapContainer, TileLayer, Marker, Popup, Tooltip, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
-import { Wind, Map as MapIcon, Users, UserCircle, Plane, Square, LogOut, Shield, Mail, LocateFixed, Clock3, Gauge, Route, Menu, X } from "lucide-react";
+import { Wind, Map as MapIcon, Users, UserCircle, Plane, Square, LogOut, Shield, Mail, LocateFixed, Clock3, Gauge, Route, Menu, X, BookOpen, Share2, Maximize2, CalendarDays, MapPin } from "lucide-react";
 import "leaflet/dist/leaflet.css";
 import "./styles.css";
 
@@ -52,6 +52,17 @@ function MapView({ pilots, ownPosition, trail }) {
   </MapContainer>;
 }
 
+function FlightTrackMap({ points }) {
+  const valid = (points || []).filter(p => Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lng)));
+  if (valid.length < 2) return <div className="flight-map-empty">Traccia GPS non disponibile</div>;
+  const coords = valid.map(p => [Number(p.lat), Number(p.lng)]);
+  const bounds = L.latLngBounds(coords);
+  return <MapContainer bounds={bounds} boundsOptions={{ padding: [18,18] }} scrollWheelZoom={false} dragging={false} zoomControl={false} doubleClickZoom={false} touchZoom={false} className="flight-track-map">
+    <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+    <Polyline positions={coords} pathOptions={{color:"#e05b35",weight:3,lineCap:"round",lineJoin:"round"}} />
+  </MapContainer>;
+}
+
 function App() {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -65,6 +76,10 @@ function App() {
   const [flying, setFlying] = useState(false);
   const [ownPosition, setOwnPosition] = useState(null);
   const [trail, setTrail] = useState([]);
+  const [currentFlightId, setCurrentFlightId] = useState(null);
+  const [logbook, setLogbook] = useState([]);
+  const [selectedFlight, setSelectedFlight] = useState(null);
+  const [logbookLoading, setLogbookLoading] = useState(false);
   const [status, setStatus] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [gpsError, setGpsError] = useState("");
@@ -82,7 +97,37 @@ function App() {
     supabase.from("profiles").select("*").eq("id", session.user.id).single()
       .then(({ data }) => { if (data) { setProfile(data); setNickname(data.nickname || ""); setRegion(data.region || "Veneto"); } });
     refreshPilots();
+    loadLogbook();
   }, [session]);
+
+  async function loadLogbook() {
+    if (!supabase || !session) return;
+    setLogbookLoading(true);
+    const { data, error } = await supabase.from("flight_sessions").select("id,pilot_id,started_at,ended_at").eq("pilot_id", session.user.id).not("ended_at", "is", null).order("started_at", { ascending: false }).limit(50);
+    if (error) { setStatus("Impossibile caricare il logbook: " + error.message); setLogbookLoading(false); return; }
+    const ids = (data || []).map(f => f.id);
+    let points = [];
+    if (ids.length) {
+      const result = await supabase.from("flight_track_points").select("flight_session_id,lat,lng,recorded_at").in("flight_session_id", ids).order("recorded_at", { ascending: true });
+      if (result.error) setStatus("Tracce non disponibili: " + result.error.message);
+      else points = result.data || [];
+    }
+    setLogbook((data || []).map(f => ({ ...f, points: points.filter(p => p.flight_session_id === f.id) })));
+    setLogbookLoading(false);
+  }
+
+  async function shareFlight(flight) {
+    const durationMs = Math.max(0, new Date(flight.ended_at) - new Date(flight.started_at));
+    const mins = Math.floor(durationMs / 60000);
+    const duration = `${String(Math.floor(mins / 60)).padStart(2,"0")}:${String(mins % 60).padStart(2,"0")}`;
+    const date = new Date(flight.started_at).toLocaleString("it-IT", { dateStyle: "long", timeStyle: "short" });
+    const message = `Il mio volo con ParaPiloti Italia 🪂\nData: ${date}\nDurata: ${duration}\nTraccia GPS registrata.\nCreated by RASTA7212`;
+    try {
+      if (navigator.share) await navigator.share({ title: "Il mio volo · ParaPiloti Italia", text: message });
+      else if (navigator.clipboard) { await navigator.clipboard.writeText(message); setStatus("Riepilogo del volo copiato: puoi incollarlo sui social."); }
+      else setStatus(message);
+    } catch (e) { if (e.name !== "AbortError") setStatus("Condivisione non disponibile su questo dispositivo."); }
+  }
 
   async function refreshPilots() {
     if (!supabase) return;
@@ -119,8 +164,11 @@ function App() {
       const p = { lat: pos.coords.latitude, lng: pos.coords.longitude, altitude_m: pos.coords.altitude == null ? null : Math.round(pos.coords.altitude), speed_kmh: pos.coords.speed == null ? null : Math.round(pos.coords.speed * 3.6), heading: pos.coords.heading, updated_at: new Date().toISOString() };
       setOwnPosition(p); setTrail([{lat:p.lat,lng:p.lng,time:Date.now()}]); setFlying(true); setStatus("Sessione avviata. Mantieni l'app autorizzata alla posizione.");
       await publishPosition(p);
-      const { error } = await supabase.from("flight_sessions").insert({ pilot_id: profile?.id || session.user.id });
-      if (error) setStatus("Posizione inviata, ma apertura sessione non riuscita: " + error.message);
+      const { data: flightSession, error } = await supabase.from("flight_sessions").insert({ pilot_id: profile?.id || session.user.id }).select("id").single();
+      if (error || !flightSession) { setStatus("Posizione inviata, ma apertura del logbook non riuscita: " + (error?.message || "sessione non creata")); return; }
+      const activeFlightId = flightSession.id;
+      setCurrentFlightId(activeFlightId);
+      await supabase.from("flight_track_points").insert({ flight_session_id: activeFlightId, pilot_id: session.user.id, lat: p.lat, lng: p.lng });
       window.__flightWatch = navigator.geolocation.watchPosition(async next => {
         const q = { lat: next.coords.latitude, lng: next.coords.longitude, altitude_m: next.coords.altitude == null ? null : Math.round(next.coords.altitude), speed_kmh: next.coords.speed == null ? null : Math.round(next.coords.speed * 3.6), heading: next.coords.heading, accuracy_m: next.coords.accuracy, updated_at: new Date().toISOString() };
         setOwnPosition(q);
@@ -142,6 +190,10 @@ function App() {
           }
           return [...recent, {lat:q.lat,lng:q.lng,time:now}];
         });
+        const accuracyOk = next.coords.accuracy <= 35;
+        if (accuracyOk && (next.coords.speed == null || next.coords.speed >= 1.5)) {
+          await supabase.from("flight_track_points").insert({ flight_session_id: activeFlightId, pilot_id: session.user.id, lat: q.lat, lng: q.lng });
+        }
         await publishPosition(q);
       }, err => setGpsError(err.message), { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
     }, err => setGpsError(err.message), { enableHighAccuracy: true, timeout: 20000 });
@@ -159,9 +211,11 @@ function App() {
     window.__flightWatch = null; setFlying(false); setOwnPosition(null);
     if (supabase && session) {
       await supabase.from("live_positions").delete().eq("user_id", session.user.id);
-      await supabase.from("flight_sessions").update({ ended_at: new Date().toISOString() }).eq("pilot_id", profile?.id || session.user.id).is("ended_at", null);
+      if (currentFlightId) await supabase.from("flight_sessions").update({ ended_at: new Date().toISOString() }).eq("id", currentFlightId).eq("pilot_id", session.user.id);
     }
-    setStatus("Volo terminato. La tua posizione non è più visibile sulla mappa.");
+    setCurrentFlightId(null);
+    setStatus("Volo terminato e salvato nel tuo logbook.");
+    loadLogbook();
     refreshPilots();
   }
 
@@ -173,7 +227,7 @@ function App() {
       <nav className={menuOpen ? "nav open" : "nav"}>
         <button className={tab === "map" ? "nav-active" : ""} onClick={() => { setTab("map"); setMenuOpen(false); }}><MapIcon size={17} /> Mappa</button>
         <button className={tab === "pilots" ? "nav-active" : ""} onClick={() => { setTab("pilots"); setMenuOpen(false); }}><Users size={17} /> Piloti</button>
-        <button className={tab === "profile" ? "nav-active" : ""} onClick={() => { setTab("profile"); setMenuOpen(false); }}><UserCircle size={17} /> Profilo</button>
+        <button className={tab === "profile" ? "nav-active" : ""} onClick={() => { setTab("profile"); setMenuOpen(false); }}><UserCircle size={17} /> Profilo</button>\n        <button className={tab === "logbook" ? "nav-active" : ""} onClick={() => { setTab("logbook"); setMenuOpen(false); loadLogbook(); }}><BookOpen size={17} /> Logbook</button>
       </nav>
       <div className="header-right">{session ? <><span className="signed-in">{profile?.nickname || session.user.email}</span><button className="icon-btn" onClick={logout} title="Esci"><LogOut size={18} /></button></> : <button className="small-primary" onClick={() => setTab("profile")}>Accedi</button>}</div>
     </header>
@@ -190,6 +244,22 @@ function App() {
             {gpsError && <div className="notice error">{gpsError}</div>}
           </>}
           {tab === "pilots" && <><div className="panel-heading"><div><div className="eyebrow dark">COMMUNITY</div><h2>Piloti in volo</h2><p>Elenco delle posizioni aggiornate di recente.</p></div><Users /></div>{pilots.map(p => <div className="pilot-row" key={p.id}><div className="avatar">{p.nickname?.slice(0, 1)?.toUpperCase() || "P"}</div><div className="pilot-info"><b>{p.nickname}</b><span>{p.region || "Italia"} · {p.demo ? "Posizione demo" : "In volo"}</span></div><div className="pilot-data"><b>{p.altitude_m ?? "—"} m</b><span>{p.speed_kmh ?? "—"} km/h</span></div><span className="status-dot"></span></div>)}</>}
+          {tab === "logbook" && <><div className="panel-heading"><div><div className="eyebrow dark">DIARIO DI BORDO</div><h2>Il mio logbook</h2><p>Ogni volo concluso viene conservato qui, con orario e traccia GPS.</p></div><BookOpen /></div>
+            {!session ? <div className="notice">Accedi per consultare e conservare il tuo diario di volo.</div> : logbookLoading ? <p>Caricamento voli...</p> : logbook.length === 0 ? <div className="empty-logbook"><Plane size={30}/><b>Il tuo primo volo ti aspetta</b><span>Quando terminerai una sessione GPS, il riepilogo apparirà qui.</span></div> : <div className="logbook-list">{logbook.map(f => {
+              const pts = f.points || [];
+              const start = new Date(f.started_at);
+              const end = new Date(f.ended_at);
+              const durationMs = Math.max(0, end - start);
+              const mins = Math.floor(durationMs / 60000);
+              const duration = `${String(Math.floor(mins / 60)).padStart(2,"0")}:${String(mins % 60).padStart(2,"0")}`;
+              return <article className="flight-log-card" key={f.id} onClick={() => setSelectedFlight(f)}>
+                <div className="flight-log-map"><FlightTrackMap points={pts} /></div>
+                <div className="flight-log-details"><b>{start.toLocaleDateString("it-IT", { day:"2-digit", month:"long", year:"numeric" })}</b><span><Clock3 size={14}/> {start.toLocaleTimeString("it-IT", {hour:"2-digit",minute:"2-digit"})} · {duration}</span><small><MapPin size={13}/> {pts.length} punti GPS registrati</small></div>
+                <button className="log-share" onClick={e => { e.stopPropagation(); shareFlight(f); }} aria-label="Condividi volo"><Share2 size={18}/></button>
+                <button className="log-expand" onClick={e => { e.stopPropagation(); setSelectedFlight(f); }} aria-label="Apri dettaglio"><Maximize2 size={17}/></button>
+              </article>;
+            })}</div>}
+          </>}
           {tab === "profile" && <><div className="panel-heading"><div><div className="eyebrow dark">AREA PERSONALE</div><h2>Il tuo profilo</h2><p>Registrati gratuitamente per entrare nella community.</p></div><UserCircle /></div>
             {!session ? <form className="auth-form" onSubmit={handleAuth}><div className="auth-switch"><button type="button" className={authMode === "signup" ? "selected" : ""} onClick={() => setAuthMode("signup")}>Registrati</button><button type="button" className={authMode === "login" ? "selected" : ""} onClick={() => setAuthMode("login")}>Accedi</button></div>
               {authMode === "signup" && <><label>Nickname<input required value={nickname} onChange={e => setNickname(e.target.value)} placeholder="Es. VentoAlto" /></label><label>Regione<select value={region} onChange={e => setRegion(e.target.value)}>{["Abruzzo", "Basilicata", "Calabria", "Campania", "Emilia-Romagna", "Friuli Venezia Giulia", "Lazio", "Liguria", "Lombardia", "Marche", "Molise", "Piemonte", "Puglia", "Sardegna", "Sicilia", "Toscana", "Trentino-Alto Adige", "Umbria", "Valle d'Aosta", "Veneto"].map(x => <option key={x}>{x}</option>)}</select></label></>}
@@ -206,6 +276,16 @@ function App() {
         </aside>
       </div>
     </main>
+    {selectedFlight && <div className="flight-modal-backdrop" onClick={() => setSelectedFlight(null)}><section className="flight-modal" onClick={e => e.stopPropagation()}>
+      <button className="modal-close" onClick={() => setSelectedFlight(null)} aria-label="Chiudi">×</button>
+      <div className="eyebrow dark">PARAPILOTI ITALIA · BY RASTA7212</div><h2>Il mio volo</h2>
+      <b>{new Date(selectedFlight.started_at).toLocaleDateString("it-IT", { dateStyle:"full" })}</b>
+      <p>{new Date(selectedFlight.started_at).toLocaleTimeString("it-IT", {hour:"2-digit",minute:"2-digit"})} – {new Date(selectedFlight.ended_at).toLocaleTimeString("it-IT", {hour:"2-digit",minute:"2-digit"})}</p>
+      <div className="flight-modal-map"><FlightTrackMap points={selectedFlight.points || []}/></div>
+      <div className="flight-modal-stats"><span><small>DURATA</small><b>{String(Math.floor((new Date(selectedFlight.ended_at)-new Date(selectedFlight.started_at))/3600000)).padStart(2,"0")}:{String(Math.floor(((new Date(selectedFlight.ended_at)-new Date(selectedFlight.started_at))%3600000)/60000)).padStart(2,"0")}</b></span><span><small>PUNTI GPS</small><b>{(selectedFlight.points || []).length}</b></span></div>
+      <button className="primary-btn full" onClick={() => shareFlight(selectedFlight)}><Share2 size={17}/> Condividi il volo</button>
+      <small className="muted">La traccia è un riepilogo GPS indicativo, non uno strumento di navigazione.</small>
+    </section></div>}
     <footer><span>© {new Date().getFullYear()} ParaPiloti in volo Italia by Rastafly</span><span>Prototipo tecnico · Non è un dispositivo di sicurezza aeronautica</span></footer>
   </div>;
 }
