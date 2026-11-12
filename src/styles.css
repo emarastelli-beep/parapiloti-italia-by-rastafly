@@ -24,3 +24,5 @@
 
 /* Pulsante per ricentrare la mappa sul pilota */
 .center-map-btn{position:absolute;z-index:650;top:14px;right:14px;width:48px;height:48px;border:0;border-radius:12px;background:#fff;color:#176b57;box-shadow:0 2px 12px #10283b44;display:grid;place-items:center;cursor:pointer}.center-map-btn:active{transform:scale(.96)}.app-shell.flight-mode .center-map-btn{position:fixed;top:calc(env(safe-area-inset-top) + 14px);right:14px;width:52px;height:52px;border-radius:50%;box-shadow:0 3px 14px #10283b55}
+
+.center-map-btn{position:absolute;z-index:1000;top:14px;right:14px;min-width:48px;height:48px;padding:0 12px;border:0;border-radius:12px;background:#fff;color:#176b57;box-shadow:0 2px 12px #10283b44;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;font:800 10px 'DM Sans';letter-spacing:.5px}.center-map-btn:active{transform:scale(.96)}.app-shell.flight-mode .center-map-btn{position:fixed;top:calc(env(safe-area-inset-top) + 14px);right:14px;height:52px;border-radius:26px;box-shadow:0 3px 14px #10283b55}
