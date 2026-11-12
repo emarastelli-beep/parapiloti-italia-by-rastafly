@@ -111,3 +111,39 @@ footer{background:#0b2032;border-top:2px solid #64b5df;color:#b8d2e1}
 
 .heading-vector-icon{background:transparent!important;border:0!important}
 .heading-vector-icon svg{display:block;filter:drop-shadow(0 1px 2px #fff) drop-shadow(0 1px 3px #10283b66)}
+
+/* PILOT LOGBOOK */
+.nav button{white-space:nowrap}
+.flight-log-card{position:relative;display:grid;grid-template-columns:150px minmax(0,1fr) auto;gap:14px;align-items:center;padding:12px;margin:12px 0;border:1px solid #cbdde8;border-radius:15px;background:#fff;box-shadow:0 5px 18px #163b530c;cursor:pointer;transition:transform .16s,box-shadow .16s}
+.flight-log-card:active{transform:scale(.99)}
+.flight-log-map{height:104px;overflow:hidden;border-radius:10px;background:#eaf3f8}
+.flight-track-map{height:100%;width:100%;min-height:90px}
+.flight-map-empty{height:100%;display:grid;place-items:center;color:#668093;font-size:11px;text-align:center;padding:8px}
+.flight-log-details{display:flex;flex-direction:column;gap:7px;min-width:0;color:#102f47}
+.flight-log-details b{font-size:14px}
+.flight-log-details span,.flight-log-details small{display:flex;align-items:center;gap:5px;color:#668093;font-size:12px}
+.log-share,.log-expand{display:grid;place-items:center;width:36px;height:36px;border:1px solid #cbdde8;border-radius:50%;background:#f5f9fc;color:#176b96}
+.log-expand{display:none}
+.empty-logbook{min-height:210px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#668093;text-align:center;padding:24px}
+.empty-logbook b{color:#102f47;font-size:17px}
+.empty-logbook span{font-size:13px;max-width:280px}
+.flight-modal-backdrop{position:fixed;inset:0;z-index:3000;background:#071b2bcc;display:flex;align-items:center;justify-content:center;padding:18px}
+.flight-modal{position:relative;width:min(620px,100%);max-height:90dvh;overflow:auto;background:#f8fbfd;border-radius:20px;padding:24px;box-shadow:0 24px 80px #0005;color:#10283b}
+.flight-modal h2{font-size:27px;margin:8px 0}
+.flight-modal p{margin:5px 0 16px;color:#668093}
+.modal-close{position:absolute;right:15px;top:12px;border:0;background:transparent;font-size:30px;color:#668093}
+.flight-modal-map{height:300px;overflow:hidden;border-radius:14px;border:1px solid #cbdde8;margin:16px 0}
+.flight-modal-stats{display:flex;gap:12px;margin:12px 0 18px}
+.flight-modal-stats span{flex:1;display:flex;flex-direction:column;gap:5px;background:#eaf3f8;padding:13px;border-radius:10px}
+.flight-modal-stats small{font-size:10px;letter-spacing:1.2px;color:#668093}
+.flight-modal-stats b{font-size:23px;color:#176b96}
+@media(max-width:600px){
+ .flight-log-card{grid-template-columns:104px minmax(0,1fr) 36px;gap:10px;padding:9px}
+ .flight-log-map{height:88px}
+ .flight-log-details b{font-size:12px}
+ .flight-log-details span,.flight-log-details small{font-size:10px}
+ .log-share{width:34px;height:34px}
+ .log-expand{display:none}
+ .flight-modal{padding:20px 16px}
+ .flight-modal-map{height:260px}
+}
