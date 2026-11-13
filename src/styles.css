@@ -314,3 +314,13 @@ footer{background:#081d2d;border-top:2px solid #5ebbe5;color:#c1d9e6;letter-spac
   .main-panel .flight-control{gap:12px}
   .main-panel .flight-control>div{min-width:0;flex:1}
 }
+
+
+/* Contrast correction for dark aviation info card */
+.dark-card h3{color:#f5fbff!important}
+.dark-card .card-icon{color:#8ed8f4}
+.dark-card p{color:#c5dbe8}
+.dark-card .privacy-line{color:#c5e9f7}
+@media(min-width:901px){
+  .hero{margin-top:54px}
+}
