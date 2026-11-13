@@ -399,3 +399,15 @@ footer{background:#081d2d;border-top:2px solid #5ebbe5;color:#c1d9e6;letter-spac
 .altitude-profile-empty span { font-size:12px; color:#607b86; line-height:1.5; }
 
 .live-privacy-control{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 16px;margin:12px 0;border:1px solid #c6dbe7;border-radius:13px;background:#f4faff}.live-privacy-control>div{display:flex;flex-direction:column;gap:5px}.live-privacy-control b{display:flex;align-items:center;gap:7px;font-size:14px;color:#163b54}.live-privacy-control small{font-size:12px;color:#456577}.live-privacy-control button{flex-shrink:0}@media(max-width:560px){.live-privacy-control{flex-direction:column;align-items:stretch}.live-privacy-control button{width:100%}}
+
+.profile-card .avatar img,.pilot-row .avatar img{width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block}
+.profile-edit-form{width:min(420px,100%);margin:12px auto;display:flex;flex-direction:column;gap:14px;text-align:left}
+.profile-edit-form h3{text-align:center;margin:4px 0}
+.profile-edit-form label{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:700;color:#23475b}
+.profile-edit-form input,.profile-edit-form select{width:100%;box-sizing:border-box;padding:11px;border:1px solid #bed4e2;border-radius:9px;background:white;color:#17394c;font:inherit}
+.profile-edit-form input[type=file]{font-size:12px}
+.profile-edit-form small{color:#607d8d;line-height:1.5}
+.profile-edit-actions{display:flex;gap:10px;flex-wrap:wrap}
+.profile-edit-actions button{flex:1}
+.profile-card>.primary-btn{margin:12px 8px 8px}
+@media(max-width:560px){.profile-edit-actions{flex-direction:column}}
