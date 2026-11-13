@@ -82,8 +82,11 @@ function AirspaceOverlay() {
       try {
         const url = `/api/airspaces?bbox=${encodeURIComponent(boundsKey)}`;
         const response = await fetch(url, { headers: { "Accept": "application/json" }, signal: controller.signal });
-        if (!response.ok) throw new Error(`OpenAIP HTTP ${response.status}`);
         const payload = await response.json();
+        if (!response.ok) {
+          const detail = payload?.details ? ` — ${String(payload.details).slice(0, 180)}` : "";
+          throw new Error(`OpenAIP HTTP ${response.status}${detail}`);
+        }
         const items = Array.isArray(payload) ? payload : (payload.items || payload.data || []);
         const features = items.filter(item => item?.geometry?.type && item?.geometry?.coordinates).map(item => ({ type:"Feature", geometry:item.geometry, properties:item }));
         setCollection({ type:"FeatureCollection", features });
