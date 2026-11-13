@@ -33,10 +33,21 @@ function CenterMapButton({ ownPosition }) {
   return <button className="center-map-btn" onClick={() => map.setView([ownPosition.lat, ownPosition.lng], Math.max(map.getZoom(), 15), { animate: true })} aria-label="Centra sulla mia posizione" title="Centra sulla mia posizione"><LocateFixed size={21} /><span>CENTRA</span></button>;
 }
 
-function MapView({ pilots, ownPosition, trail }) {
+function MapView({ pilots, ownPosition, trail, mapLayer }) {
   const center = ownPosition ? [ownPosition.lat, ownPosition.lng] : [42.8, 12.5];
+  const openAipKey = import.meta.env.VITE_OPENAIP_API_KEY;
+  const satellite = mapLayer === "satellite";
   return <MapContainer center={center} zoom={ownPosition ? 15 : 6} scrollWheelZoom className="map">
-    <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+    {satellite
+      ? <TileLayer attribution='Imagery &copy; <a href="https://www.esri.com/">Esri</a>' url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" maxZoom={19} />
+      : <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />}
+    {mapLayer === "aviation" && openAipKey && <TileLayer
+      attribution='Dati aeronautici &copy; <a href="https://www.openaip.net/">OpenAIP</a>'
+      url={`https://api.tiles.openaip.net/api/data/openaip/{z}/{x}/{y}.png?apiKey=${encodeURIComponent(openAipKey)}`}
+      opacity={0.88}
+      maxZoom={14}
+      zIndex={450}
+    />}
     <FollowPilot ownPosition={ownPosition} />
     <CenterMapButton ownPosition={ownPosition} />
     {trail.length > 1 && <Polyline positions={trail.map(p => [p.lat, p.lng])} pathOptions={{ color: "#e05b35", weight: 2.5, opacity: 0.95, dashArray: "5 7", lineCap: "round", lineJoin: "round" }} />}
@@ -73,6 +84,7 @@ function App() {
   const [region, setRegion] = useState("Veneto");
   const [authMode, setAuthMode] = useState("signup");
   const [tab, setTab] = useState("map");
+  const [mapLayer, setMapLayer] = useState("street");
   const [pilots, setPilots] = useState(demoPilots);
   const [flying, setFlying] = useState(false);
   const [ownPosition, setOwnPosition] = useState(null);
@@ -307,7 +319,16 @@ function App() {
       <div className="content-grid">
         <section className="main-panel">
           {tab === "map" && <><div className="panel-heading"><div><div className="eyebrow dark">LIVE FLIGHT TRACKING</div><h2>Situazione in volo</h2><p>Le posizioni reali sono visibili solo agli utenti autenticati.</p></div><span className="live-pill"><i></i> LIVE</span></div>
-            <div className="map-wrap"><MapView key={flying ? "flight-map" : "normal-map"} pilots={pilots} ownPosition={ownPosition} trail={trail} /><div className="map-legend"><span><i className="legend-dot green"></i> Piloti attivi</span><span><i className="legend-dot blue"></i> La tua posizione</span></div></div>
+            <div className="map-wrap">
+              <div className="map-layer-controls" role="group" aria-label="Tipo di mappa">
+                <button type="button" className={mapLayer === "street" ? "active" : ""} onClick={() => setMapLayer("street")}><MapIcon size={15} /> Stradale</button>
+                <button type="button" className={mapLayer === "satellite" ? "active" : ""} onClick={() => setMapLayer("satellite")}><MapPin size={15} /> Satellite</button>
+                <button type="button" className={mapLayer === "aviation" ? "active" : ""} onClick={() => setMapLayer("aviation")}><Plane size={15} /> Aeronautica</button>
+              </div>
+              <MapView key={flying ? "flight-map" : "normal-map"} pilots={pilots} ownPosition={ownPosition} trail={trail} mapLayer={mapLayer} />
+              {mapLayer === "aviation" && !import.meta.env.VITE_OPENAIP_API_KEY && <div className="aviation-layer-notice"><b>Livello aeronautico da attivare</b><span>Per mostrare spazi aerei e aeroporti serve configurare la chiave API OpenAIP. La mappa sottostante non rappresenta gli spazi aerei.</span></div>}
+              <div className="map-legend"><span><i className="legend-dot green"></i> Piloti attivi</span><span><i className="legend-dot blue"></i> La tua posizione</span></div>
+            </div>
             <div className="flight-control"><div><b>{flying ? "Sessione di volo attiva" : "Pronto al decollo?"}</b><span>{flying ? "La posizione viene condivisa con gli iscritti." : "Avvia la condivisione quando sei pronto."}</span></div><button className={flying ? "danger-btn" : "primary-btn"} onClick={flying ? stopFlight : startFlight}>{flying ? <Square size={17} /> : <Plane size={17} />} {flying ? "Termina volo" : "Avvia il mio volo"}</button></div>
             {gpsError && <div className="notice error">{gpsError}</div>}
           </>}
