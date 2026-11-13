@@ -7,6 +7,7 @@ import { Wind, Map as MapIcon, Users, UserCircle, Plane, Square, LogOut, Shield,
 import "leaflet/dist/leaflet.css";
 import "./styles.css";
 import Equipment from "./Equipment.jsx";
+import FlightTerrain3D from "./FlightTerrain3D.jsx";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -91,6 +92,7 @@ function App() {
   const [currentFlightId, setCurrentFlightId] = useState(null);
   const [logbook, setLogbook] = useState([]);
   const [selectedFlight, setSelectedFlight] = useState(null);
+  const [flightMapMode, setFlightMapMode] = useState("2d");
   const [logbookLoading, setLogbookLoading] = useState(false);
   const [status, setStatus] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -340,11 +342,11 @@ function App() {
               const durationMs = Math.max(0, end - start);
               const mins = Math.floor(durationMs / 60000);
               const duration = `${String(Math.floor(mins / 60)).padStart(2,"0")}:${String(mins % 60).padStart(2,"0")}`;
-              return <article className="flight-log-card" key={f.id} onClick={() => setSelectedFlight(f)}>
+              return <article className="flight-log-card" key={f.id} onClick={() => { setFlightMapMode("2d"); setSelectedFlight(f); }}>
                 <div className="flight-log-map"><FlightTrackMap points={pts} /></div>
                 <div className="flight-log-details"><b>{start.toLocaleDateString("it-IT", { day:"2-digit", month:"long", year:"numeric" })}</b><span><Clock3 size={14}/> {start.toLocaleTimeString("it-IT", {hour:"2-digit",minute:"2-digit"})} · {duration}</span><small><MapPin size={13}/> {pts.length} punti GPS · {f.avg_speed_kmh != null ? Number(f.avg_speed_kmh).toFixed(1) + " km/h media" : "velocità n/d"} · {f.fuel_consumed_l != null ? Number(f.fuel_consumed_l).toFixed(1) + " L stimati" : "carburante n/d"}</small></div>
                 <button className="log-share" onClick={e => { e.stopPropagation(); shareFlight(f); }} aria-label="Condividi volo"><Share2 size={18}/></button>
-                <button className="log-expand" onClick={e => { e.stopPropagation(); setSelectedFlight(f); }} aria-label="Apri dettaglio"><Maximize2 size={17}/></button>
+                <button className="log-expand" onClick={e => { e.stopPropagation(); setFlightMapMode("2d"); setSelectedFlight(f); }} aria-label="Apri dettaglio"><Maximize2 size={17}/></button>
                 <button className="log-delete" onClick={e => { e.stopPropagation(); deleteFlight(f); }} aria-label="Elimina volo" title="Elimina volo"><Trash2 size={17}/></button>
               </article>;
             })}</div>}
@@ -371,7 +373,13 @@ function App() {
       <div className="eyebrow dark">PILOT ADVISOR · BY RASTA7212</div><h2>Il mio volo</h2>
       <b>{new Date(selectedFlight.started_at).toLocaleDateString("it-IT", { dateStyle:"full" })}</b>
       <p>{new Date(selectedFlight.started_at).toLocaleTimeString("it-IT", {hour:"2-digit",minute:"2-digit"})} – {new Date(selectedFlight.ended_at).toLocaleTimeString("it-IT", {hour:"2-digit",minute:"2-digit"})}</p>
-      <div className="flight-modal-map"><FlightTrackMap points={selectedFlight.points || []}/></div>
+      <div className="flight-view-switch" role="group" aria-label="Visualizzazione della traccia">
+        <button type="button" className={flightMapMode === "2d" ? "active" : ""} onClick={() => setFlightMapMode("2d")}>Mappa 2D</button>
+        <button type="button" className={flightMapMode === "3d" ? "active" : ""} onClick={() => setFlightMapMode("3d")}>Terreno 3D</button>
+      </div>
+      <div className={flightMapMode === "3d" ? "flight-modal-map flight-modal-map-3d" : "flight-modal-map"}>
+        {flightMapMode === "3d" ? <FlightTerrain3D points={selectedFlight.points || []}/> : <FlightTrackMap points={selectedFlight.points || []}/>}
+      </div>
       <div className="flight-modal-stats"><span><small>DURATA</small><b>{String(Math.floor((new Date(selectedFlight.ended_at)-new Date(selectedFlight.started_at))/3600000)).padStart(2,"0")}:{String(Math.floor(((new Date(selectedFlight.ended_at)-new Date(selectedFlight.started_at))%3600000)/60000)).padStart(2,"0")}</b></span><span><small>PUNTI GPS</small><b>{(selectedFlight.points || []).length}</b></span><span><small>MEDIA GPS</small><b>{selectedFlight.avg_speed_kmh == null ? "—" : Number(selectedFlight.avg_speed_kmh).toFixed(1) + " km/h"}</b></span><span><small>MAX GPS</small><b>{selectedFlight.max_speed_kmh == null ? "—" : Number(selectedFlight.max_speed_kmh).toFixed(1) + " km/h"}</b></span><span><small>MIN GPS</small><b>{selectedFlight.min_speed_kmh == null ? "—" : Number(selectedFlight.min_speed_kmh).toFixed(1) + " km/h"}</b></span><span><small>CARBURANTE STIMATO</small><b>{selectedFlight.fuel_consumed_l == null ? "—" : Number(selectedFlight.fuel_consumed_l).toFixed(1) + " L"}</b></span></div>
       <button className="primary-btn full" onClick={() => shareFlight(selectedFlight)}><Share2 size={17}/> Condividi volo e traccia</button>
       <button className="outline-btn full" onClick={() => exportFlightGpx(selectedFlight)}><Route size={17}/> Esporta traccia GPX</button>
