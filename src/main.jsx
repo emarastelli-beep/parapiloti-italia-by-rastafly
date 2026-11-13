@@ -120,7 +120,7 @@ function App() {
   function flightGpx(flight) {
     const points = (flight.points || []).filter(p => Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lng)));
     const track = points.map(p => `      <trkpt lat="${Number(p.lat)}" lon="${Number(p.lng)}"><time>${new Date(p.recorded_at || flight.started_at).toISOString()}</time></trkpt>`).join("\n");
-    return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="ParaPiloti Italia · RASTA7212" xmlns="http://www.topografix.com/GPX/1/1"><metadata><name>Volo ParaPiloti Italia</name><time>${new Date(flight.started_at).toISOString()}</time></metadata><trk><name>Traccia GPS</name><trkseg>\n${track}\n    </trkseg></trk></gpx>`;
+    return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="PILOT-ADVISOR · RASTA7212" xmlns="http://www.topografix.com/GPX/1/1"><metadata><name>Volo ParaPiloti Italia</name><time>${new Date(flight.started_at).toISOString()}</time></metadata><trk><name>Traccia GPS</name><trkseg>\n${track}\n    </trkseg></trk></gpx>`;
   }
 
   function exportFlightGpx(flight) {
@@ -274,25 +274,25 @@ function App() {
   const activePilots = pilots.filter(p => !p.demo).length;
   return <div className={flying ? "app-shell flight-mode" : "app-shell"}>
     <header className="topbar">
-      <div className="brand"><div className="brand-mark" aria-label="Orizzonte artificiale"><svg viewBox="0 0 64 64" role="img" aria-hidden="true"><circle cx="32" cy="32" r="27" fill="#10283b" stroke="#dce8ee" strokeWidth="2.5"/><path d="M8 32a24 24 0 0 1 48 0" fill="#55a9d6"/><path d="M8 32a24 24 0 0 0 48 0" fill="#c58b45"/><path d="M8 32h48" stroke="#f4f7f9" strokeWidth="2.5"/><path d="M20 22h7m10 0h7M24 27h5m6 0h5M20 42h7m10 0h7" stroke="#f4f7f9" strokeWidth="2" strokeLinecap="round"/><path d="M17 32h11l4-4 4 4h11" fill="none" stroke="#fff" strokeWidth="3" strokeLinejoin="round"/></svg></div><div className="brand-wordmark"><strong>ParaPiloti <span>Italia</span></strong><small className="brand-creator">BY RASTA7212</small></div></div>
+      <div className="brand"><div className="brand-mark" aria-label="Pilot-Advisor"><svg viewBox="0 0 64 64" role="img" aria-hidden="true"><circle cx="32" cy="32" r="28" fill="#0b2032" stroke="#d9edf7" strokeWidth="2"/><circle cx="32" cy="32" r="22" fill="none" stroke="#55b8e6" strokeWidth="1.5" strokeDasharray="3 3"/><path d="M10 25 Q32 5 54 25 Q32 17 10 25Z" fill="#f8fbfd" stroke="#55b8e6" strokeWidth="1.5"/><path d="M17 26L32 43L47 26M32 27V48" fill="none" stroke="#f8fbfd" strokeWidth="1.8" strokeLinecap="round"/><path d="M32 13V7M51 32H57M32 51V57M7 32H13" stroke="#83c9ed" strokeWidth="2" strokeLinecap="round"/><path d="M32 29L36 36L32 34L28 36Z" fill="#83c9ed"/></svg></div><div className="brand-wordmark"><strong>PILOT-<span>ADVISOR</span></strong><small className="brand-creator">BY RASTA7212</small></div></div>
       <button className="icon-btn mobile-menu" onClick={() => setMenuOpen(!menuOpen)} aria-label="Menu">{menuOpen ? <X /> : <Menu />}</button>
       <nav className={menuOpen ? "nav open" : "nav"}>
-        <button className={tab === "map" ? "nav-active" : ""} onClick={() => { setTab("map"); setMenuOpen(false); }}><MapIcon size={17} /> Mappa</button>
-        <button className={tab === "pilots" ? "nav-active" : ""} onClick={() => { setTab("pilots"); setMenuOpen(false); }}><Users size={17} /> Piloti</button>
+        <button className={tab === "map" ? "nav-active" : ""} onClick={() => { setTab("map"); setMenuOpen(false); }}><MapIcon size={17} /> Live GPS</button>
+        <button className={tab === "pilots" ? "nav-active" : ""} onClick={() => { setTab("pilots"); setMenuOpen(false); }}><Users size={17} /> Community</button>
         <button className={tab === "profile" ? "nav-active" : ""} onClick={() => { setTab("profile"); setMenuOpen(false); }}><UserCircle size={17} /> Profilo</button>
         <button className={tab === "logbook" ? "nav-active" : ""} onClick={() => { setTab("logbook"); setMenuOpen(false); loadLogbook(); }}><BookOpen size={17} /> Logbook</button>
-        <button className={tab === "equipment" ? "nav-active" : ""} onClick={() => { setTab("equipment"); setMenuOpen(false); }}><Wrench size={17} /> Attrezzatura</button>
+        <button className={tab === "equipment" ? "nav-active" : ""} onClick={() => { setTab("equipment"); setMenuOpen(false); }}><Wrench size={17} /> Tecnica</button>
       </nav>
       <div className="header-right">{session ? <><span className="signed-in">{profile?.nickname || session.user.email}</span><button className="icon-btn" onClick={logout} title="Esci"><LogOut size={18} /></button></> : <button className="small-primary" onClick={() => setTab("profile")}>Accedi</button>}</div>
     </header>
     <main>
       <section className="hero">
-        <div><div className="eyebrow"><span className="pulse"></span> COMMUNITY NAZIONALE</div><h1>Il cielo è più bello<br /><em>quando si vola insieme.</em></h1><p>Scopri i piloti in volo, condividi la tua posizione e ritrova la tua community, in tutta Italia.</p></div>
+        <div><div className="eyebrow"><span className="pulse"></span> FLIGHT MANAGEMENT SYSTEM</div><h1>La tua cabina di pilotaggio<br /><em>digitale, sempre con te.</em></h1><p>GPS live, diario di volo, statistiche e gestione dell’attrezzatura: tutto ciò che serve al pilota, in un’unica piattaforma.</p></div>
         <div className="hero-stats"><div><b>{configured ? activePilots : "—"}</b><span>Piloti live</span></div><div><b>{configured ? "Online" : "Demo"}</b><span>Stato piattaforma</span></div></div>
       </section>
       <div className="content-grid">
         <section className="main-panel">
-          {tab === "map" && <><div className="panel-heading"><div><div className="eyebrow dark">LIVE TRACKING</div><h2>Mappa dei piloti</h2><p>Le posizioni reali sono visibili solo agli utenti autenticati.</p></div><span className="live-pill"><i></i> LIVE</span></div>
+          {tab === "map" && <><div className="panel-heading"><div><div className="eyebrow dark">LIVE FLIGHT TRACKING</div><h2>Situazione in volo</h2><p>Le posizioni reali sono visibili solo agli utenti autenticati.</p></div><span className="live-pill"><i></i> LIVE</span></div>
             <div className="map-wrap"><MapView key={flying ? "flight-map" : "normal-map"} pilots={pilots} ownPosition={ownPosition} trail={trail} /><div className="map-legend"><span><i className="legend-dot green"></i> Piloti attivi</span><span><i className="legend-dot blue"></i> La tua posizione</span></div></div>
             <div className="flight-control"><div><b>{flying ? "Sessione di volo attiva" : "Pronto al decollo?"}</b><span>{flying ? "La posizione viene condivisa con gli iscritti." : "Avvia la condivisione quando sei pronto."}</span></div><button className={flying ? "danger-btn" : "primary-btn"} onClick={flying ? stopFlight : startFlight}>{flying ? <Square size={17} /> : <Plane size={17} />} {flying ? "Termina volo" : "Avvia il mio volo"}</button></div>
             {gpsError && <div className="notice error">{gpsError}</div>}
@@ -333,7 +333,7 @@ function App() {
     </main>
     {selectedFlight && <div className="flight-modal-backdrop" onClick={() => setSelectedFlight(null)}><section className="flight-modal" onClick={e => e.stopPropagation()}>
       <button className="modal-close" onClick={() => setSelectedFlight(null)} aria-label="Chiudi">×</button>
-      <div className="eyebrow dark">PARAPILOTI ITALIA · BY RASTA7212</div><h2>Il mio volo</h2>
+      <div className="eyebrow dark">PILOT-ADVISOR · BY RASTA7212</div><h2>Il mio volo</h2>
       <b>{new Date(selectedFlight.started_at).toLocaleDateString("it-IT", { dateStyle:"full" })}</b>
       <p>{new Date(selectedFlight.started_at).toLocaleTimeString("it-IT", {hour:"2-digit",minute:"2-digit"})} – {new Date(selectedFlight.ended_at).toLocaleTimeString("it-IT", {hour:"2-digit",minute:"2-digit"})}</p>
       <div className="flight-modal-map"><FlightTrackMap points={selectedFlight.points || []}/></div>
@@ -342,7 +342,7 @@ function App() {
       <button className="outline-btn full" onClick={() => exportFlightGpx(selectedFlight)}><Route size={17}/> Esporta traccia GPX</button>
       <small className="muted">La traccia è un riepilogo GPS indicativo, non uno strumento di navigazione.</small>
     </section></div>}
-    <footer><span>© {new Date().getFullYear()} ParaPiloti in volo Italia by Rastafly</span><span>Prototipo tecnico · Non è un dispositivo di sicurezza aeronautica</span></footer>
+    <footer><span>© {new Date().getFullYear()} PILOT-ADVISOR · RASTA7212</span><span>Prototipo tecnico · Non è un dispositivo di sicurezza aeronautica</span></footer>
   </div>;
 }
 
