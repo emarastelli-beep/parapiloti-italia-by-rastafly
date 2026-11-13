@@ -107,10 +107,10 @@ function updateSelection(map, points, index, samples) {
       properties: { base: Math.max(0, base), top, color }
     });
     features = [
-      disc(70, railTop - 7, railTop + 14, "#ffffff"),
-      disc(58, railTop + 14, railTop + 44, "#ff8a18"),
-      disc(46, railTop + 44, railTop + 68, "#ffae37"),
-      disc(29, railTop + 68, railTop + 83, "#ffe0a0")
+      disc(110, railTop - 7, railTop + 23, "#ffffff"),
+      disc(93, railTop + 23, railTop + 71, "#ff8a18"),
+      disc(74, railTop + 71, railTop + 110, "#ffae37"),
+      disc(47, railTop + 110, railTop + 134, "#ffe0a0")
     ];
   }
   source.setData({type:"FeatureCollection",features});
