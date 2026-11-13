@@ -104,7 +104,7 @@ function App() {
   async function loadLogbook() {
     if (!supabase || !session) return;
     setLogbookLoading(true);
-    const { data, error } = await supabase.from("flight_sessions").select("id,pilot_id,started_at,ended_at").eq("pilot_id", session.user.id).not("ended_at", "is", null).order("started_at", { ascending: false }).limit(50);
+    const { data, error } = await supabase.from("flight_sessions").select("id,pilot_id,started_at,ended_at,avg_speed_kmh,max_speed_kmh,min_speed_kmh,fuel_consumed_l,equipment_snapshot").eq("pilot_id", session.user.id).not("ended_at", "is", null).order("started_at", { ascending: false }).limit(50);
     if (error) { setStatus("Impossibile caricare il logbook: " + error.message); setLogbookLoading(false); return; }
     const ids = (data || []).map(f => f.id);
     let points = [];
@@ -308,7 +308,7 @@ function App() {
               const duration = `${String(Math.floor(mins / 60)).padStart(2,"0")}:${String(mins % 60).padStart(2,"0")}`;
               return <article className="flight-log-card" key={f.id} onClick={() => setSelectedFlight(f)}>
                 <div className="flight-log-map"><FlightTrackMap points={pts} /></div>
-                <div className="flight-log-details"><b>{start.toLocaleDateString("it-IT", { day:"2-digit", month:"long", year:"numeric" })}</b><span><Clock3 size={14}/> {start.toLocaleTimeString("it-IT", {hour:"2-digit",minute:"2-digit"})} · {duration}</span><small><MapPin size={13}/> {pts.length} punti GPS registrati</small></div>
+                <div className="flight-log-details"><b>{start.toLocaleDateString("it-IT", { day:"2-digit", month:"long", year:"numeric" })}</b><span><Clock3 size={14}/> {start.toLocaleTimeString("it-IT", {hour:"2-digit",minute:"2-digit"})} · {duration}</span><small><MapPin size={13}/> {pts.length} punti GPS · {f.avg_speed_kmh != null ? Number(f.avg_speed_kmh).toFixed(1) + " km/h media" : "velocità n/d"} · {f.fuel_consumed_l != null ? Number(f.fuel_consumed_l).toFixed(1) + " L stimati" : "carburante n/d"}</small></div>
                 <button className="log-share" onClick={e => { e.stopPropagation(); shareFlight(f); }} aria-label="Condividi volo"><Share2 size={18}/></button>
                 <button className="log-expand" onClick={e => { e.stopPropagation(); setSelectedFlight(f); }} aria-label="Apri dettaglio"><Maximize2 size={17}/></button>
               </article>;
@@ -337,7 +337,7 @@ function App() {
       <b>{new Date(selectedFlight.started_at).toLocaleDateString("it-IT", { dateStyle:"full" })}</b>
       <p>{new Date(selectedFlight.started_at).toLocaleTimeString("it-IT", {hour:"2-digit",minute:"2-digit"})} – {new Date(selectedFlight.ended_at).toLocaleTimeString("it-IT", {hour:"2-digit",minute:"2-digit"})}</p>
       <div className="flight-modal-map"><FlightTrackMap points={selectedFlight.points || []}/></div>
-      <div className="flight-modal-stats"><span><small>DURATA</small><b>{String(Math.floor((new Date(selectedFlight.ended_at)-new Date(selectedFlight.started_at))/3600000)).padStart(2,"0")}:{String(Math.floor(((new Date(selectedFlight.ended_at)-new Date(selectedFlight.started_at))%3600000)/60000)).padStart(2,"0")}</b></span><span><small>PUNTI GPS</small><b>{(selectedFlight.points || []).length}</b></span></div>
+      <div className="flight-modal-stats"><span><small>DURATA</small><b>{String(Math.floor((new Date(selectedFlight.ended_at)-new Date(selectedFlight.started_at))/3600000)).padStart(2,"0")}:{String(Math.floor(((new Date(selectedFlight.ended_at)-new Date(selectedFlight.started_at))%3600000)/60000)).padStart(2,"0")}</b></span><span><small>PUNTI GPS</small><b>{(selectedFlight.points || []).length}</b></span><span><small>MEDIA GPS</small><b>{selectedFlight.avg_speed_kmh == null ? "—" : Number(selectedFlight.avg_speed_kmh).toFixed(1) + " km/h"}</b></span><span><small>MAX GPS</small><b>{selectedFlight.max_speed_kmh == null ? "—" : Number(selectedFlight.max_speed_kmh).toFixed(1) + " km/h"}</b></span><span><small>MIN GPS</small><b>{selectedFlight.min_speed_kmh == null ? "—" : Number(selectedFlight.min_speed_kmh).toFixed(1) + " km/h"}</b></span><span><small>CARBURANTE STIMATO</small><b>{selectedFlight.fuel_consumed_l == null ? "—" : Number(selectedFlight.fuel_consumed_l).toFixed(1) + " L"}</b></span></div>
       <button className="primary-btn full" onClick={() => shareFlight(selectedFlight)}><Share2 size={17}/> Condividi volo e traccia</button>
       <button className="outline-btn full" onClick={() => exportFlightGpx(selectedFlight)}><Route size={17}/> Esporta traccia GPX</button>
       <small className="muted">La traccia è un riepilogo GPS indicativo, non uno strumento di navigazione.</small>
