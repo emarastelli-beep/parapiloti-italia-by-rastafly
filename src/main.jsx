@@ -59,7 +59,7 @@ function airspacePopup(feature) {
   return `<div class="airspace-popup"><strong>${safe(p.name || "Spazio aereo")}</strong><span>${safe(airspaceTypeName(p.type))} · Classe ${safe(classCode)}</span><span><b>Limite inferiore:</b> ${safe(airspaceLimit(p.lowerLimit))}</span><span><b>Limite superiore:</b> ${safe(airspaceLimit(p.upperLimit))}</span>${frequencies ? `<span><b>Frequenze:</b> ${safe(frequencies)}</span>` : ""}${hours ? `<span><b>Orari:</b> ${safe(hours)}</span>` : ""}<small>Dati OpenAIP · verifica sempre AIP e NOTAM ufficiali</small></div>`;
 }
 
-function AirspaceOverlay({ apiKey }) {
+function AirspaceOverlay() {
   const map = useMap();
   const [boundsKey, setBoundsKey] = useState("");
   const [collection, setCollection] = useState(null);
@@ -74,13 +74,13 @@ function AirspaceOverlay({ apiKey }) {
     setBoundsKey([b.getWest(),b.getSouth(),b.getEast(),b.getNorth()].map(v => v.toFixed(3)).join(","));
   }, [map]);
   useEffect(() => {
-    if (!apiKey || !boundsKey || map.getZoom() < 7) { setCollection(null); setAirspaceError(""); setAirspaceLoading(false); return; }
+    if (!boundsKey || map.getZoom() < 7) { setCollection(null); setAirspaceError(""); setAirspaceLoading(false); return; }
     setAirspaceLoading(true);
     setAirspaceError("");
     const controller = new AbortController();
     const timer = setTimeout(async () => {
       try {
-        const url = `https://api.core.openaip.net/api/airspaces?bbox=${boundsKey}&page=1&limit=500&apiKey=${encodeURIComponent(apiKey)}`;
+        const url = `/api/airspaces?bbox=${encodeURIComponent(boundsKey)}`;
         const response = await fetch(url, { headers: { "Accept": "application/json" }, signal: controller.signal });
         if (!response.ok) throw new Error(`OpenAIP HTTP ${response.status}`);
         const payload = await response.json();
@@ -93,7 +93,7 @@ function AirspaceOverlay({ apiKey }) {
       } finally { if (!controller.signal.aborted) setAirspaceLoading(false); }
     }, 450);
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [apiKey, boundsKey, map]);
+  }, [boundsKey, map]);
   if (!collection?.features?.length) return <div className="airspace-load-status">{airspaceLoading ? "Caricamento spazi aerei…" : airspaceError || "In attesa dei dati aeronautici…"}</div>;
   const palette = {1:"#d94841",2:"#e28b28",3:"#bd2525",4:"#2676b8",7:"#347db5",8:"#c06a32",9:"#8a5ab5",13:"#2676b8",14:"#8a5ab5",17:"#d2a52b",18:"#c77c35",25:"#8a5ab5",26:"#347db5",28:"#249477"};
   return <GeoJSON key={boundsKey} data={collection} style={feature => {
@@ -118,7 +118,7 @@ function MapView({ pilots, ownPosition, trail, mapLayer }) {
       maxZoom={14}
       zIndex={450}
     />}
-    {mapLayer === "aviation" && openAipKey && <AirspaceOverlay apiKey={openAipKey} />}
+    {mapLayer === "aviation" && <AirspaceOverlay />}
     <FollowPilot ownPosition={ownPosition} />
     <CenterMapButton ownPosition={ownPosition} />
     {trail.length > 1 && <Polyline positions={trail.map(p => [p.lat, p.lng])} pathOptions={{ color: "#e05b35", weight: 2.5, opacity: 0.95, dashArray: "5 7", lineCap: "round", lineJoin: "round" }} />}
