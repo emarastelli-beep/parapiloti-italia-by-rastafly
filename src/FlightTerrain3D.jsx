@@ -93,10 +93,12 @@ export default function FlightTerrain3D({ points, activeIndex }) {
       map.addLayer({ id: "flight-airborne-ribbon", type: "fill-extrusion", source: "flight-airborne",
         paint: { "fill-extrusion-color": "#f36a2c", "fill-extrusion-opacity": 0.94,
           "fill-extrusion-base": ["get", "base"], "fill-extrusion-height": ["get", "top"] } });
+      let ribbonReady = false;
       const updateElevated = () => {
+        if (ribbonReady) return;
         try {
           const ribbon = flightRibbon(valid, map);
-          if (ribbon.features.length) map.getSource("flight-airborne")?.setData(ribbon);
+          if (ribbon.features.length) { ribbonReady = true; map.getSource("flight-airborne")?.setData(ribbon); }
         } catch (error) { console.warn("3D flight ribbon:", error); }
       };
       map.on("idle", updateElevated);
