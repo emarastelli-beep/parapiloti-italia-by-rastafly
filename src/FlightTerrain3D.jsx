@@ -18,6 +18,16 @@ function square(lng, lat, metres) {
   const dLat = metres / 111320, dLng = metres / (111320 * Math.cos(lat * Math.PI / 180));
   return [[lng-dLng,lat-dLat],[lng+dLng,lat-dLat],[lng+dLng,lat+dLat],[lng-dLng,lat+dLat],[lng-dLng,lat-dLat]];
 }
+function circleRing(lng, lat, radius, segments = 24) {
+  const ring = [];
+  const latScale = radius / 111320;
+  const lngScale = radius / (111320 * Math.max(0.1, Math.cos(lat * Math.PI / 180)));
+  for (let i = 0; i <= segments; i++) {
+    const angle = 2 * Math.PI * i / segments;
+    ring.push([lng + Math.cos(angle) * lngScale, lat + Math.sin(angle) * latScale]);
+  }
+  return ring;
+}
 function airborneFeatures(points, map) {
   const rail = [], posts = [];
   let sampled = 0;
@@ -89,9 +99,19 @@ function updateSelection(map, points, index, samples) {
       return Math.max(2,Number(points[i].altitude_m)-(Number.isFinite(g)?g:ground));
     });
     const railTop=Math.max(flightHeight,...nearbyHeights)+2;
-    const markerTop=railTop+70;
-    features=[{type:"Feature",geometry:{type:"Polygon",coordinates:[square(lng,lat,65)]},
-      properties:{base:Math.max(0,railTop-8),top:markerTop}}];
+    // Layered circular extrusions create a soft, rounded glowing beacon
+    // without introducing another WebGL renderer or breaking chart hover.
+    const disc = (radius, base, top, color) => ({
+      type: "Feature",
+      geometry: { type: "Polygon", coordinates: [circleRing(lng, lat, radius)] },
+      properties: { base: Math.max(0, base), top, color }
+    });
+    features = [
+      disc(70, railTop - 7, railTop + 14, "#ffffff"),
+      disc(58, railTop + 14, railTop + 44, "#ff8a18"),
+      disc(46, railTop + 44, railTop + 68, "#ffae37"),
+      disc(29, railTop + 68, railTop + 83, "#ffe0a0")
+    ];
   }
   source.setData({type:"FeatureCollection",features});
 }
@@ -173,10 +193,10 @@ export default function FlightTerrain3D({ points, activeIndex }) {
         map.once("idle",refresh);
         map.on("moveend",refresh);
       }
-      // A tiny elevated orange extrusion marks the GPS altitude, not ground level.
+      // A rounded orange beacon with a white rim marks the flight altitude.
       map.addSource("flight-chart-selection", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
       map.addLayer({ id: "flight-chart-selection", type: "fill-extrusion", source: "flight-chart-selection",
-        paint: { "fill-extrusion-color": "#ff8b1a", "fill-extrusion-opacity": 1,
+        paint: { "fill-extrusion-color": ["get", "color"], "fill-extrusion-opacity": 1,
           "fill-extrusion-height": ["get", "top"], "fill-extrusion-base": ["get", "base"] } });
       updateSelection(map, valid, selectedIndexRef.current, groundSamplesRef.current);
       new maplibregl.Marker({ color: "#13a879" }).setLngLat(coords[0]).addTo(map);
