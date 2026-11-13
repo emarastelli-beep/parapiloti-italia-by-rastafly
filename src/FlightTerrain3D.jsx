@@ -69,7 +69,7 @@ export default function FlightTerrain3D({ points, activeIndex }) {
       zoom: 11,
       pitch: 65,
       bearing: -25,
-      antialias: true,
+      antialias: false,
       attributionControl: true
     });
     } catch (error) {
@@ -77,6 +77,8 @@ export default function FlightTerrain3D({ points, activeIndex }) {
       return;
     }
     mapRef.current = map;
+    map.scrollZoom.disable();
+    map.touchZoomRotate.disableRotation();
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
     map.on("load", () => {
       try {
@@ -101,7 +103,7 @@ export default function FlightTerrain3D({ points, activeIndex }) {
           if (ribbon.features.length) { ribbonReady = true; map.getSource("flight-airborne")?.setData(ribbon); }
         } catch (error) { console.warn("3D flight ribbon:", error); }
       };
-      map.on("idle", updateElevated);
+      map.once("idle", updateElevated);
       updateElevated();
       new maplibregl.Marker({ color: "#13a879" }).setLngLat(coords[0]).addTo(map);
       new maplibregl.Marker({ color: "#d9473e" }).setLngLat(coords[coords.length - 1]).addTo(map);
@@ -109,10 +111,13 @@ export default function FlightTerrain3D({ points, activeIndex }) {
       map.resize();
       } catch (error) { setMessage("Errore durante il disegno della traccia: " + error.message); }
     });
+    const canvas = map.getCanvas();
+    const onContextLost = event => { event.preventDefault(); setMessage("Il motore grafico 3D ha perso la connessione con la scheda video. Torna alla mappa 2D e riapri il 3D."); };
+    canvas.addEventListener("webglcontextlost", onContextLost, false);
     map.on("error", event => {
       if (event?.error) setMessage("Alcune porzioni del rilievo potrebbero non essere disponibili. Verifica la connessione.");
     });
-    return () => { mapRef.current = null; markerRef.current?.remove(); markerRef.current = null; try { map.remove(); } catch (_) { /* cleanup */ } };
+    return () => { canvas.removeEventListener("webglcontextlost", onContextLost); mapRef.current = null; markerRef.current?.remove(); markerRef.current = null; try { map.remove(); } catch (_) { /* cleanup */ } };
   }, [points]);
 
   useEffect(() => {
@@ -130,7 +135,7 @@ export default function FlightTerrain3D({ points, activeIndex }) {
   if (valid.length < 2) return <div className="flight-map-empty">Servono almeno due punti GPS per la visualizzazione 3D.</div>;
   return <div className="terrain-3d-wrap">
     <div ref={container} className="terrain-3d-map" aria-label="Traccia del volo sulla mappa tridimensionale del terreno" />
-    <div className="terrain-3d-hint">Trascina per ruotare · usa i controlli per inclinare e zoomare</div>
+    <div className="terrain-3d-hint">Trascina per ruotare · zoom con + e − · rotellina per scorrere la pagina</div>
     {message && <div className="terrain-3d-notice">{message}</div>}
     <small className="terrain-3d-disclaimer">Traccia arancione tratteggiata sospesa sul terreno quando sono disponibili quota GPS e dati altimetrici del suolo. Altezza indicativa, non utilizzabile per la navigazione.</small>
   </div>;
