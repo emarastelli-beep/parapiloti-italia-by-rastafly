@@ -18,10 +18,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    const url = new URL(`https://a.api.tiles.openaip.net/api/data/openaip/${z}/${x}/${y}.png`);
-    const upstream = await fetch(url, {
-      headers: { "x-openaip-api-key": apiKey, "Accept": "image/png" }
-    });
+    const url = new URL(`https://api.tiles.openaip.net/api/data/openaip/${z}/${x}/${y}.png`);
+    url.searchParams.set("apiKey", apiKey);
+    const upstream = await fetch(url);
     if (!upstream.ok) {
       const details = await upstream.text();
       console.error("OpenAIP tile response:", upstream.status, details.slice(0, 500));
