@@ -296,3 +296,21 @@ footer{background:#081d2d;border-top:2px solid #5ebbe5;color:#c1d9e6;letter-spac
   .profile-card{padding:24px 14px}
   .profile-card .muted{overflow-wrap:anywhere}
 }
+
+
+/* Final mobile layout fix: keep the map panel's children in normal block flow */
+@media(max-width:900px){
+  .content-grid{display:flex!important;flex-direction:column!important;align-items:stretch!important}
+  .content-grid>.main-panel{display:block!important;width:100%;max-width:100%;min-width:0;flex:0 0 auto;order:1}
+  .content-grid>.side-panel{display:flex!important;flex-direction:column!important;width:100%;max-width:100%;min-width:0;flex:0 0 auto;order:2}
+  .main-panel .panel-heading{display:flex!important}
+  .main-panel .map-wrap{display:block!important;width:100%;height:clamp(340px,52vh,520px)!important;min-height:340px}
+  .main-panel .map{display:block!important;width:100%!important;height:100%!important}
+  .main-panel .flight-control{display:flex!important;flex-direction:row!important;align-items:center;justify-content:space-between;flex-wrap:wrap}
+}
+@media(max-width:560px){
+  .content-grid>.main-panel{padding:16px 14px}
+  .main-panel .map-wrap{height:clamp(340px,55vh,500px)!important}
+  .main-panel .flight-control{gap:12px}
+  .main-panel .flight-control>div{min-width:0;flex:1}
+}
