@@ -166,6 +166,17 @@ function App() {
     loadLogbook();
   }, [session]);
 
+  async function saveTrackPoint(flightId, position) {
+    const base = { flight_session_id: flightId, pilot_id: session.user.id, lat: position.lat, lng: position.lng };
+    const withAltitude = { ...base, altitude_m: position.altitude_m == null ? null : Number(position.altitude_m) };
+    let result = await supabase.from("flight_track_points").insert(withAltitude);
+    // Compatibility with databases not yet migrated: never lose the GPS track.
+    if (result.error && /altitude_m|schema cache|column/i.test(result.error.message || "")) {
+      result = await supabase.from("flight_track_points").insert(base);
+    }
+    return result;
+  }
+
   async function loadLogbook() {
     if (!supabase || !session) return;
     setLogbookLoading(true);
@@ -174,7 +185,10 @@ function App() {
     const ids = (data || []).map(f => f.id);
     let points = [];
     if (ids.length) {
-      const result = await supabase.from("flight_track_points").select("flight_session_id,lat,lng,recorded_at").in("flight_session_id", ids).order("recorded_at", { ascending: true });
+      let result = await supabase.from("flight_track_points").select("flight_session_id,lat,lng,altitude_m,recorded_at").in("flight_session_id", ids).order("recorded_at", { ascending: true });
+      if (result.error && /altitude_m|schema cache|column/i.test(result.error.message || "")) {
+        result = await supabase.from("flight_track_points").select("flight_session_id,lat,lng,recorded_at").in("flight_session_id", ids).order("recorded_at", { ascending: true });
+      }
       if (result.error) setStatus("Tracce non disponibili: " + result.error.message);
       else points = result.data || [];
     }
@@ -280,7 +294,7 @@ function App() {
       if (error || !flightSession) { setStatus("Posizione inviata, ma apertura del logbook non riuscita: " + (error?.message || "sessione non creata")); return; }
       const activeFlightId = flightSession.id;
       setCurrentFlightId(activeFlightId);
-      await supabase.from("flight_track_points").insert({ flight_session_id: activeFlightId, pilot_id: session.user.id, lat: p.lat, lng: p.lng });
+      await saveTrackPoint(activeFlightId, p);
       window.__lastSavedTrackPoint = { lat: p.lat, lng: p.lng, time: Date.now() };
       window.__flightWatch = navigator.geolocation.watchPosition(async next => {
         const q = { lat: next.coords.latitude, lng: next.coords.longitude, altitude_m: next.coords.altitude == null ? null : Math.round(next.coords.altitude), speed_kmh: next.coords.speed == null ? null : Math.round(next.coords.speed * 3.6), heading: next.coords.heading, accuracy_m: next.coords.accuracy, updated_at: new Date().toISOString() };
@@ -312,7 +326,7 @@ function App() {
         const movedMeters = Math.hypot(dLatSaved, dLngSaved);
         const moving = next.coords.speed != null ? next.coords.speed >= 1.5 : movedMeters >= 15;
         if (accuracyOk && moving && movedMeters >= 5) {
-          const { error: pointError } = await supabase.from("flight_track_points").insert({ flight_session_id: activeFlightId, pilot_id: session.user.id, lat: q.lat, lng: q.lng });
+          const { error: pointError } = await saveTrackPoint(activeFlightId, q);
           if (!pointError) window.__lastSavedTrackPoint = { lat: q.lat, lng: q.lng, time: Date.now() };
         }
         await publishPosition(q);
