@@ -75,6 +75,46 @@ function FlightTrackMap({ points }) {
   </MapContainer>;
 }
 
+// Demo locale: nessun inserimento in Supabase e nessuna posizione condivisa.
+function createDemoFlight() {
+  const start = new Date("2026-11-13T10:00:00+01:00");
+  const anchors = [
+    [46.0184, 11.9070, 340], // Feltre
+    [46.0302, 11.9240, 570],
+    [46.0430, 11.9470, 840],
+    [46.0520, 11.9720, 1110],
+    [46.0460, 11.9940, 1280],
+    [46.0310, 12.0030, 1010],
+    [46.0130, 11.9810, 710],
+    [46.0070, 11.9470, 490],
+    [46.0184, 11.9070, 340]
+  ];
+  const points = [];
+  const steps = 12;
+  for (let segment = 0; segment < anchors.length - 1; segment++) {
+    const [latA, lngA, altA] = anchors[segment];
+    const [latB, lngB, altB] = anchors[segment + 1];
+    for (let i = 0; i < steps; i++) {
+      const t = i / steps;
+      const smooth = t * t * (3 - 2 * t);
+      const elapsed = (segment * steps + i) * 25_000;
+      points.push({
+        lat: latA + (latB - latA) * smooth,
+        lng: lngA + (lngB - lngA) * smooth,
+        altitude_m: Math.round(altA + (altB - altA) * smooth),
+        recorded_at: new Date(start.getTime() + elapsed).toISOString()
+      });
+    }
+  }
+  points.push({ lat: anchors.at(-1)[0], lng: anchors.at(-1)[1], altitude_m: 340, recorded_at: new Date(start.getTime() + (anchors.length - 1) * steps * 25_000).toISOString() });
+  return {
+    id: "demo-feltre-3d", demo: true, started_at: start.toISOString(),
+    ended_at: points.at(-1).recorded_at,
+    avg_speed_kmh: 38.5, max_speed_kmh: 57.2, min_speed_kmh: 12.4,
+    fuel_consumed_l: 2.6, points
+  };
+}
+
 function App() {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -334,7 +374,7 @@ function App() {
             {gpsError && <div className="notice error">{gpsError}</div>}
           </>}
           {tab === "pilots" && <><div className="panel-heading"><div><div className="eyebrow dark">COMMUNITY</div><h2>Piloti in volo</h2><p>Elenco delle posizioni aggiornate di recente.</p></div><Users /></div>{pilots.map(p => <div className="pilot-row" key={p.id}><div className="avatar">{p.nickname?.slice(0, 1)?.toUpperCase() || "P"}</div><div className="pilot-info"><b>{p.nickname}</b><span>{p.region || "Italia"} · {p.demo ? "Posizione demo" : "In volo"}</span></div><div className="pilot-data"><b>{p.altitude_m ?? "—"} m</b><span>{p.speed_kmh ?? "—"} km/h</span></div><span className="status-dot"></span></div>)}</>}
-          {tab === "logbook" && <><div className="panel-heading"><div><div className="eyebrow dark">DIARIO DI BORDO</div><h2>Il mio logbook</h2><p>Ogni volo concluso viene conservato qui, con orario e traccia GPS.</p></div><BookOpen /></div>
+          {tab === "logbook" && <><div className="panel-heading"><div><div className="eyebrow dark">DIARIO DI BORDO</div><h2>Il mio logbook</h2><p>Ogni volo concluso viene conservato qui, con orario e traccia GPS.</p></div><BookOpen /></div><div className="logbook-demo-panel"><div><b>Prova la mappa 3D dal Mac</b><span>Volo simulato sulle Prealpi Bellunesi · dati di prova, non salvati tra i voli reali</span></div><button type="button" className="primary-btn" onClick={() => { setFlightMapMode("3d"); setSelectedFlight(createDemoFlight()); }}>Apri volo demo 3D</button></div>
             {!session ? <div className="notice">Accedi per consultare e conservare il tuo diario di volo.</div> : logbookLoading ? <p>Caricamento voli...</p> : logbook.length === 0 ? <div className="empty-logbook"><Plane size={30}/><b>Il tuo primo volo ti aspetta</b><span>Quando terminerai una sessione GPS, il riepilogo apparirà qui.</span></div> : <div className="logbook-list">{logbook.map(f => {
               const pts = f.points || [];
               const start = new Date(f.started_at);
@@ -370,7 +410,7 @@ function App() {
     </main>
     {selectedFlight && <div className="flight-modal-backdrop" onClick={() => setSelectedFlight(null)}><section className="flight-modal" onClick={e => e.stopPropagation()}>
       <button className="modal-close" onClick={() => setSelectedFlight(null)} aria-label="Chiudi">×</button>
-      <div className="eyebrow dark">PILOT ADVISOR · BY RASTA7212</div><h2>Il mio volo</h2>
+      <div className="eyebrow dark">PILOT ADVISOR · BY RASTA7212</div><h2>{selectedFlight.demo ? "Volo dimostrativo · Feltre" : "Il mio volo"}</h2>{selectedFlight.demo && <p className="demo-flight-label">SIMULAZIONE · Nessun volo reale registrato · Nessun dato aggiunto al tuo account</p>}
       <b>{new Date(selectedFlight.started_at).toLocaleDateString("it-IT", { dateStyle:"full" })}</b>
       <p>{new Date(selectedFlight.started_at).toLocaleTimeString("it-IT", {hour:"2-digit",minute:"2-digit"})} – {new Date(selectedFlight.ended_at).toLocaleTimeString("it-IT", {hour:"2-digit",minute:"2-digit"})}</p>
       <div className="flight-view-switch" role="group" aria-label="Visualizzazione della traccia">
@@ -381,9 +421,9 @@ function App() {
         {flightMapMode === "3d" ? <FlightTerrain3D points={selectedFlight.points || []}/> : <FlightTrackMap points={selectedFlight.points || []}/>}
       </div>
       <div className="flight-modal-stats"><span><small>DURATA</small><b>{String(Math.floor((new Date(selectedFlight.ended_at)-new Date(selectedFlight.started_at))/3600000)).padStart(2,"0")}:{String(Math.floor(((new Date(selectedFlight.ended_at)-new Date(selectedFlight.started_at))%3600000)/60000)).padStart(2,"0")}</b></span><span><small>PUNTI GPS</small><b>{(selectedFlight.points || []).length}</b></span><span><small>MEDIA GPS</small><b>{selectedFlight.avg_speed_kmh == null ? "—" : Number(selectedFlight.avg_speed_kmh).toFixed(1) + " km/h"}</b></span><span><small>MAX GPS</small><b>{selectedFlight.max_speed_kmh == null ? "—" : Number(selectedFlight.max_speed_kmh).toFixed(1) + " km/h"}</b></span><span><small>MIN GPS</small><b>{selectedFlight.min_speed_kmh == null ? "—" : Number(selectedFlight.min_speed_kmh).toFixed(1) + " km/h"}</b></span><span><small>CARBURANTE STIMATO</small><b>{selectedFlight.fuel_consumed_l == null ? "—" : Number(selectedFlight.fuel_consumed_l).toFixed(1) + " L"}</b></span></div>
-      <button className="primary-btn full" onClick={() => shareFlight(selectedFlight)}><Share2 size={17}/> Condividi volo e traccia</button>
+      {!selectedFlight.demo && <button className="primary-btn full" onClick={() => shareFlight(selectedFlight)}><Share2 size={17}/> Condividi volo e traccia</button>}
       <button className="outline-btn full" onClick={() => exportFlightGpx(selectedFlight)}><Route size={17}/> Esporta traccia GPX</button>
-      <button className="log-delete-modal full" onClick={() => deleteFlight(selectedFlight)}><Trash2 size={17}/> Elimina questo volo</button>
+      {!selectedFlight.demo && <button className="log-delete-modal full" onClick={() => deleteFlight(selectedFlight)}><Trash2 size={17}/> Elimina questo volo</button>}
       <small className="muted">La traccia è un riepilogo GPS indicativo, non uno strumento di navigazione.</small>
     </section></div>}
     <footer><span>© {new Date().getFullYear()} PILOT ADVISOR · RASTA7212</span><span>Prototipo tecnico · Non è un dispositivo di sicurezza aeronautica</span></footer>
