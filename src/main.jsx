@@ -63,6 +63,8 @@ function AirspaceOverlay({ apiKey }) {
   const map = useMap();
   const [boundsKey, setBoundsKey] = useState("");
   const [collection, setCollection] = useState(null);
+  const [airspaceError, setAirspaceError] = useState("");
+  const [airspaceLoading, setAirspaceLoading] = useState(false);
   useMapEvents({ moveend: () => {
     const b = map.getBounds();
     setBoundsKey([b.getWest(),b.getSouth(),b.getEast(),b.getNorth()].map(v => v.toFixed(3)).join(","));
@@ -72,24 +74,27 @@ function AirspaceOverlay({ apiKey }) {
     setBoundsKey([b.getWest(),b.getSouth(),b.getEast(),b.getNorth()].map(v => v.toFixed(3)).join(","));
   }, [map]);
   useEffect(() => {
-    if (!apiKey || !boundsKey || map.getZoom() < 7) { setCollection(null); return; }
+    if (!apiKey || !boundsKey || map.getZoom() < 7) { setCollection(null); setAirspaceError(""); setAirspaceLoading(false); return; }
+    setAirspaceLoading(true);
+    setAirspaceError("");
     const controller = new AbortController();
     const timer = setTimeout(async () => {
       try {
-        const url = `https://api.core.openaip.net/api/airspaces?bbox=${encodeURIComponent(boundsKey)}&page=1&limit=100`;
-        const response = await fetch(url, { headers: { "x-openaip-api-key": apiKey, "Accept": "application/json" }, signal: controller.signal });
+        const url = `https://api.core.openaip.net/api/airspaces?bbox=${boundsKey}&page=1&limit=500&apiKey=${encodeURIComponent(apiKey)}`;
+        const response = await fetch(url, { headers: { "Accept": "application/json" }, signal: controller.signal });
         if (!response.ok) throw new Error(`OpenAIP HTTP ${response.status}`);
         const payload = await response.json();
-        const items = Array.isArray(payload) ? payload : (payload.items || []);
+        const items = Array.isArray(payload) ? payload : (payload.items || payload.data || []);
         const features = items.filter(item => item?.geometry?.type && item?.geometry?.coordinates).map(item => ({ type:"Feature", geometry:item.geometry, properties:item }));
         setCollection({ type:"FeatureCollection", features });
+        if (!features.length) setAirspaceError("Nessuno spazio aereo restituito per quest’area. Prova ad allargare leggermente la mappa.");
       } catch (error) {
-        if (error.name !== "AbortError") console.warn("OpenAIP airspaces:", error);
-      }
+        if (error.name !== "AbortError") { console.warn("OpenAIP airspaces:", error); setAirspaceError(`Dati spazi aerei non disponibili (${error.message}).`); }
+      } finally { if (!controller.signal.aborted) setAirspaceLoading(false); }
     }, 450);
     return () => { clearTimeout(timer); controller.abort(); };
   }, [apiKey, boundsKey, map]);
-  if (!collection?.features?.length) return null;
+  if (!collection?.features?.length) return <div className="airspace-load-status">{airspaceLoading ? "Caricamento spazi aerei…" : airspaceError || "In attesa dei dati aeronautici…"}</div>;
   const palette = {1:"#d94841",2:"#e28b28",3:"#bd2525",4:"#2676b8",7:"#347db5",8:"#c06a32",9:"#8a5ab5",13:"#2676b8",14:"#8a5ab5",17:"#d2a52b",18:"#c77c35",25:"#8a5ab5",26:"#347db5",28:"#249477"};
   return <GeoJSON key={boundsKey} data={collection} style={feature => {
     const type = Number(feature?.properties?.type);
