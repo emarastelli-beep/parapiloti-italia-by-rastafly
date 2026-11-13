@@ -11,86 +11,51 @@ function boundsFor(points) {
   return [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]];
 }
 
-// Custom WebGL line layer: every vertex is positioned at its own GPS altitude
-// above mean sea level, not at a height relative to the underlying terrain.
-function createAirborneLayer(points) {
-  const vertices = [];
+// MapLibre-native fill extrusions: stable on browsers where custom WebGL
+// layers are invisible. Heights are calculated from the same MSL GPS altitudes
+// as the altitude chart, subtracting sampled terrain MSL at each vertex.
+function square(lng, lat, metres) {
+  const dLat = metres / 111320, dLng = metres / (111320 * Math.cos(lat * Math.PI / 180));
+  return [[lng-dLng,lat-dLat],[lng+dLng,lat-dLat],[lng+dLng,lat+dLat],[lng-dLng,lat+dLat],[lng-dLng,lat-dLat]];
+}
+function airborneFeatures(points, map) {
+  const rail = [], posts = [];
+  let sampled = 0;
+  const ground = p => {
+    const value = map.queryTerrainElevation([Number(p.lng), Number(p.lat)], { exaggerated: false });
+    if (Number.isFinite(value)) sampled++;
+    return Number.isFinite(value) ? value : null;
+  };
+  const samples = points.map(p => p.altitude_m == null ? null : ground(p));
   for (let i = 0; i < points.length - 1; i++) {
-    const a = points[i], b = points[i + 1];
-    if (a.altitude_m == null || b.altitude_m == null) continue;
-    const altA = Number(a.altitude_m), altB = Number(b.altitude_m);
-    if (!Number.isFinite(altA) || !Number.isFinite(altB)) continue;
-    // A genuine wide 3D ribbon (triangles), not 1-pixel WebGL lines.
-    // Each edge uses its own GPS MSL altitude; dash gaps are real gaps.
-    const steps = 8;
-    for (let k = 0; k < steps; k += 2) {
-      const vertex = t => {
-        const lng = Number(a.lng) + (Number(b.lng) - Number(a.lng)) * t;
-        const lat = Number(a.lat) + (Number(b.lat) - Number(a.lat)) * t;
-        const altitude = altA + (altB - altA) * t;
-        return maplibregl.MercatorCoordinate.fromLngLat({ lng, lat }, altitude);
-      };
-      const p = vertex(k / steps), q = vertex((k + 1) / steps);
-      const dx = q.x - p.x, dy = q.y - p.y;
-      const len = Math.hypot(dx, dy);
-      if (len < 1e-12) continue;
-      const width = p.meterInMercatorCoordinateUnits() * 11;
-      const ox = -dy / len * width, oy = dx / len * width;
-      const l0 = [p.x + ox, p.y + oy, p.z], r0 = [p.x - ox, p.y - oy, p.z];
-      const l1 = [q.x + ox, q.y + oy, q.z], r1 = [q.x - ox, q.y - oy, q.z];
-      vertices.push(...l0, ...r0, ...l1, ...l1, ...r0, ...r1);
+    const a = points[i], b = points[i+1], altA = Number(a.altitude_m), altB = Number(b.altitude_m);
+    if (a.altitude_m == null || b.altitude_m == null || !Number.isFinite(altA) || !Number.isFinite(altB)) continue;
+    if (samples[i] == null || samples[i+1] == null) continue;
+    const aHeight = Math.max(2, altA - samples[i]);
+    const bHeight = Math.max(2, altB - samples[i+1]);
+    const dx = Number(b.lng) - Number(a.lng), dy = Number(b.lat) - Number(a.lat);
+    const cosLat = Math.cos(Number(a.lat)*Math.PI/180);
+    const len = Math.hypot(dx*cosLat,dy);
+    if (len < 1e-10) continue;
+    const width = 7 / 111320;
+    const ox = -dy/len*width/cosLat, oy = dx*cosLat/len*width;
+    // Alternate visible sections and gaps for a dashed flight route.
+    for (let j=0;j<8;j+=2) {
+      const p=j/8, q=(j+1)/8;
+      const point=t=>[Number(a.lng)+dx*t, Number(a.lat)+dy*t];
+      const p0=point(p),p1=point(q);
+      const ring=[[p0[0]+ox,p0[1]+oy],[p1[0]+ox,p1[1]+oy],[p1[0]-ox,p1[1]-oy],[p0[0]-ox,p0[1]-oy]];
+      const h0=aHeight+(bHeight-aHeight)*p,h1=aHeight+(bHeight-aHeight)*q;
+      // Split into short sections, so each piece follows the climb/descent.
+      rail.push({type:"Feature",geometry:{type:"Polygon",coordinates:[[...ring,ring[0]]]},properties:{base:Math.max(0,Math.min(h0,h1)-5),top:Math.max(h0,h1)+2}});
     }
   }
-  return {
-    id: "flight-airborne-absolute",
-    type: "custom",
-    renderingMode: "3d",
-    onAdd(map, gl) {
-      this.gl = gl;
-      const vertex = gl.createShader(gl.VERTEX_SHADER);
-      gl.shaderSource(vertex, "uniform mat4 u_matrix; attribute vec3 a_position; void main() { gl_Position = u_matrix * vec4(a_position, 1.0); }");
-      gl.compileShader(vertex);
-      const fragment = gl.createShader(gl.FRAGMENT_SHADER);
-      gl.shaderSource(fragment, "precision mediump float; void main() { gl_FragColor = vec4(0.953, 0.416, 0.173, 1.0); }");
-      gl.compileShader(fragment);
-      const program = gl.createProgram();
-      gl.attachShader(program, vertex);
-      gl.attachShader(program, fragment);
-      gl.linkProgram(program);
-      gl.deleteShader(vertex); gl.deleteShader(fragment);
-      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-        const error = gl.getProgramInfoLog(program);
-        gl.deleteProgram(program);
-        throw new Error("Impossibile preparare la traccia 3D: " + error);
-      }
-      this.program = program;
-      this.matrixLocation = gl.getUniformLocation(program, "u_matrix");
-      this.positionLocation = gl.getAttribLocation(program, "a_position");
-      this.buffer = gl.createBuffer();
-      this.vertexCount = vertices.length / 3;
-      gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
-      gl.bindBuffer(gl.ARRAY_BUFFER, null);
-    },
-    render(gl, options) {
-      if (!this.vertexCount || !this.program) return;
-      const matrix = options?.defaultProjectionData?.mainMatrix || options?.modelViewProjectionMatrix || options;
-      if (!matrix || matrix.length !== 16) return;
-      gl.enable(gl.DEPTH_TEST);
-      gl.useProgram(this.program);
-      gl.uniformMatrix4fv(this.matrixLocation, false, matrix);
-      gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
-      gl.enableVertexAttribArray(this.positionLocation);
-      gl.vertexAttribPointer(this.positionLocation, 3, gl.FLOAT, false, 0, 0);
-      gl.drawArrays(gl.TRIANGLES, 0, this.vertexCount);
-      gl.disableVertexAttribArray(this.positionLocation);
-      gl.bindBuffer(gl.ARRAY_BUFFER, null);
-    },
-    onRemove(map, gl) {
-      if (this.buffer) gl.deleteBuffer(this.buffer);
-      if (this.program) gl.deleteProgram(this.program);
-    }
-  };
+  for(let i=0;i<points.length;i+=6) {
+    const p=points[i], alt=Number(p.altitude_m);
+    if (p.altitude_m == null || !Number.isFinite(alt) || samples[i] == null) continue;
+    posts.push({type:"Feature",geometry:{type:"Polygon",coordinates:[square(Number(p.lng),Number(p.lat),2.2)]},properties:{top:Math.max(2,alt-samples[i])}});
+  }
+  return {rail:{type:"FeatureCollection",features:rail},posts:{type:"FeatureCollection",features:posts},sampled};
 }
 
 export default function FlightTerrain3D({ points, activeIndex }) {
@@ -140,17 +105,34 @@ export default function FlightTerrain3D({ points, activeIndex }) {
         if (typeof map.setTerrain === "function") map.setTerrain({ source: "terrain", exaggeration: 1.35 });
       } catch (error) { setMessage("Il terreno 3D non è disponibile su questo browser: " + error.message); }
       try {
-      if (!valid.some(p => p.altitude_m != null)) {
       map.addSource("flight-path", { type: "geojson", data: {
         type: "Feature", geometry: { type: "LineString", coordinates: coords }, properties: {}
       }});
       map.addLayer({ id: "flight-path-line", type: "line", source: "flight-path", paint: {
-        "line-color": "#f36a2c", "line-width": 3.5, "line-opacity": 0.98, "line-dasharray": [2.5, 2.5]
+        "line-color": "#1479e1", "line-width": 2.3, "line-opacity": 0.5, "line-dasharray": [2.5, 3]
       }, layout: { "line-cap": "round", "line-join": "round" }});
-      }
       if (valid.some(p => p.altitude_m != null)) {
-        try { map.addLayer(createAirborneLayer(valid)); }
-        catch (error) { console.warn("Traccia 3D in quota non disponibile", error); }
+        const empty={type:"FeatureCollection",features:[]};
+        map.addSource("flight-rail-3d",{type:"geojson",data:empty});
+        map.addSource("flight-posts-3d",{type:"geojson",data:empty});
+        map.addLayer({id:"flight-posts-3d",type:"fill-extrusion",source:"flight-posts-3d",
+          paint:{"fill-extrusion-color":"#61b9ff","fill-extrusion-opacity":0.55,"fill-extrusion-height":["get","top"],"fill-extrusion-base":0}});
+        map.addLayer({id:"flight-rail-3d",type:"fill-extrusion",source:"flight-rail-3d",
+          paint:{"fill-extrusion-color":"#0869d9","fill-extrusion-opacity":0.98,
+            "fill-extrusion-height":["get","top"],"fill-extrusion-base":["get","base"]}});
+        let updated=false;
+        const refresh=()=>{
+          if (updated || !map.getSource("flight-rail-3d")) return;
+          try {
+            const result=airborneFeatures(valid,map);
+            if (!result.rail.features.length) return;
+            map.getSource("flight-rail-3d").setData(result.rail);
+            map.getSource("flight-posts-3d").setData(result.posts);
+            updated=true;
+          } catch(error) { console.warn("3D terrain samples:",error); }
+        };
+        map.once("idle",refresh);
+        map.on("moveend",refresh);
       }
       new maplibregl.Marker({ color: "#13a879" }).setLngLat(coords[0]).addTo(map);
       new maplibregl.Marker({ color: "#d9473e" }).setLngLat(coords[coords.length - 1]).addTo(map);
@@ -184,6 +166,6 @@ export default function FlightTerrain3D({ points, activeIndex }) {
     <div ref={container} className="terrain-3d-map" aria-label="Traccia del volo sulla mappa tridimensionale del terreno" />
     <div className="terrain-3d-hint">Trascina per ruotare · zoom con + e − · rotellina per scorrere la pagina</div>
     {message && <div className="terrain-3d-notice">{message}</div>}
-    <small className="terrain-3d-disclaimer">La traccia arancione in aria usa le quote GPS assolute degli stessi punti del grafico altimetrico (metri sul livello del mare). Visualizzazione non adatta alla navigazione.</small>
+    <small className="terrain-3d-disclaimer">Traccia blu sospesa e sostegni verticali: quota GPS MSL meno quota del terreno. La linea tratteggiata sottostante indica la proiezione al suolo. Simulazione non adatta alla navigazione.</small>
   </div>;
 }
