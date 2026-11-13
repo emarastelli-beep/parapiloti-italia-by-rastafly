@@ -129,6 +129,10 @@ function createDemoFlight() {
 function App() {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [nickname, setNickname] = useState("");
@@ -163,7 +167,7 @@ function App() {
   useEffect(() => {
     if (!session || !supabase) return;
     supabase.from("profiles").select("*").eq("id", session.user.id).single()
-      .then(({ data }) => { if (data) { setProfile(data); setNickname(data.nickname || ""); setRegion(data.region || "Veneto"); } });
+      .then(({ data }) => { if (data) { setProfile(data); setNickname(data.nickname || ""); setRegion(data.region || "Veneto"); setEditingProfile(false); setAvatarFile(null); setAvatarPreview(null); } });
     refreshPilots();
     loadLogbook();
   }, [session]);
@@ -253,12 +257,58 @@ function App() {
     } catch (e) { if (e.name !== "AbortError") setStatus("Condivisione non disponibile su questo dispositivo."); }
   }
 
+  async function saveProfile(e) {
+    e.preventDefault();
+    if (!supabase || !session || profileSaving) return;
+    const name = nickname.trim();
+    if (name.length < 2 || name.length > 35) { setStatus("Il nickname deve contenere da 2 a 35 caratteri."); return; }
+    setProfileSaving(true);
+    let avatarUrl = profile?.avatar_url || null;
+    try {
+      if (avatarFile) {
+        if (!avatarFile.type.startsWith("image/") || avatarFile.size > 5 * 1024 * 1024) throw new Error("Scegli una foto JPG, PNG o WebP di massimo 5 MB.");
+        const image = await createImageBitmap(avatarFile);
+        const side = 320, canvas = document.createElement("canvas");
+        canvas.width = side; canvas.height = side;
+        const ctx = canvas.getContext("2d");
+        const crop = Math.min(image.width, image.height);
+        ctx.drawImage(image, (image.width - crop) / 2, (image.height - crop) / 2, crop, crop, 0, 0, side, side);
+        image.close();
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", 0.82));
+        if (!blob) throw new Error("Impossibile elaborare la foto.");
+        const path = `${session.user.id}/avatar-${Date.now()}.jpg`;
+        const { error: uploadError } = await supabase.storage.from("pilot-avatars").upload(path, blob, { contentType: "image/jpeg", upsert: false });
+        if (uploadError) throw uploadError;
+        avatarUrl = supabase.storage.from("pilot-avatars").getPublicUrl(path).data.publicUrl;
+      }
+      const { data, error } = await supabase.from("profiles").update({ nickname: name, region, avatar_url: avatarUrl }).eq("id", session.user.id).select("*").single();
+      if (error) throw error;
+      setProfile(data);
+      setAvatarFile(null); setAvatarPreview(null); setEditingProfile(false);
+      setStatus("Profilo aggiornato correttamente.");
+      refreshPilots();
+    } catch (err) {
+      setStatus("Profilo non aggiornato: " + (err.message || "errore sconosciuto") + ". Se manca la colonna avatar_url o il contenitore pilot-avatars, esegui la migrazione Supabase.");
+    } finally { setProfileSaving(false); }
+  }
+
+  function pickAvatar(file) {
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 5 * 1024 * 1024) {
+      setStatus("La foto deve essere JPG, PNG o WebP e non superare 5 MB."); return;
+    }
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+  }
+
   async function refreshPilots() {
     if (!supabase) return;
     const cutoff = new Date(Date.now() - 2 * 60 * 1000).toISOString();
-    const { data, error } = await supabase.from("live_positions").select("user_id,latitude,longitude,altitude_m,speed_kmh,heading,updated_at,profiles(nickname,region)").gte("updated_at", cutoff);
+    let result = await supabase.from("live_positions").select("user_id,latitude,longitude,altitude_m,speed_kmh,heading,updated_at,profiles(nickname,region,avatar_url)").gte("updated_at", cutoff);
+    if (result.error && /avatar_url|column|schema cache/i.test(result.error.message || "")) result = await supabase.from("live_positions").select("user_id,latitude,longitude,altitude_m,speed_kmh,heading,updated_at,profiles(nickname,region)").gte("updated_at", cutoff);
+    const { data, error } = result;
     if (error) { setStatus(error.message); return; }
-    setPilots((data || []).map(p => ({ id: p.user_id, lat: p.latitude, lng: p.longitude, altitude_m: p.altitude_m, speed_kmh: p.speed_kmh, heading: p.heading, nickname: p.profiles?.nickname || "Pilota", region: p.profiles?.region })));
+    setPilots((data || []).map(p => ({ id: p.user_id, lat: p.latitude, lng: p.longitude, altitude_m: p.altitude_m, speed_kmh: p.speed_kmh, heading: p.heading, nickname: p.profiles?.nickname || "Pilota", region: p.profiles?.region, avatar_url: p.profiles?.avatar_url })));
   }
 
   async function handleAuth(e) {
@@ -419,7 +469,7 @@ function App() {
             {session && <div className="live-privacy-control"><div><b><Shield size={17}/> Visibilità della mia posizione</b><small>{shareLivePosition ? "PUBBLICA durante il volo: gli altri piloti possono vederti." : "PRIVATA: solo tu vedi il GPS e registri i voli."}</small></div><button type="button" className={shareLivePosition ? "outline-btn" : "primary-btn"} onClick={toggleLiveSharing} aria-pressed={shareLivePosition}>{shareLivePosition ? "Rendi privata" : "Condividi posizione"}</button></div>}
             {gpsError && <div className="notice error">{gpsError}</div>}
           </>}
-          {tab === "pilots" && <><div className="panel-heading"><div><div className="eyebrow dark">COMMUNITY</div><h2>Piloti in volo</h2><p>Elenco delle posizioni aggiornate di recente.</p></div><Users /></div>{pilots.map(p => <div className="pilot-row" key={p.id}><div className="avatar">{p.nickname?.slice(0, 1)?.toUpperCase() || "P"}</div><div className="pilot-info"><b>{p.nickname}</b><span>{p.region || "Italia"} · {p.demo ? "Posizione demo" : "In volo"}</span></div><div className="pilot-data"><b>{p.altitude_m ?? "—"} m</b><span>{p.speed_kmh ?? "—"} km/h</span></div><span className="status-dot"></span></div>)}</>}
+          {tab === "pilots" && <><div className="panel-heading"><div><div className="eyebrow dark">COMMUNITY</div><h2>Piloti in volo</h2><p>Elenco delle posizioni aggiornate di recente.</p></div><Users /></div>{pilots.map(p => <div className="pilot-row" key={p.id}><div className="avatar">{p.avatar_url ? <img src={p.avatar_url} alt="" referrerPolicy="no-referrer" /> : (p.nickname?.slice(0, 1)?.toUpperCase() || "P")}</div><div className="pilot-info"><b>{p.nickname}</b><span>{p.region || "Italia"} · {p.demo ? "Posizione demo" : "In volo"}</span></div><div className="pilot-data"><b>{p.altitude_m ?? "—"} m</b><span>{p.speed_kmh ?? "—"} km/h</span></div><span className="status-dot"></span></div>)}</>}
           {tab === "logbook" && <><div className="panel-heading"><div><div className="eyebrow dark">DIARIO DI BORDO</div><h2>Il mio logbook</h2><p>Ogni volo concluso viene conservato qui, con orario e traccia GPS.</p></div><BookOpen /></div><div className="logbook-demo-panel"><div><b>Prova la mappa 3D dal Mac</b><span>Volo simulato sulle Prealpi Bellunesi · dati di prova, non salvati tra i voli reali</span></div><button type="button" className="primary-btn" onClick={() => { setFlightMapMode("3d"); setSelectedTrackPoint(null); setSelectedFlight(createDemoFlight()); }}>Apri volo demo 3D</button></div>
             {!session ? <div className="notice">Accedi per consultare e conservare il tuo diario di volo.</div> : logbookLoading ? <p>Caricamento voli...</p> : logbook.length === 0 ? <div className="empty-logbook"><Plane size={30}/><b>Il tuo primo volo ti aspetta</b><span>Quando terminerai una sessione GPS, il riepilogo apparirà qui.</span></div> : <div className="logbook-list">{logbook.map(f => {
               const pts = f.points || [];
@@ -443,7 +493,7 @@ function App() {
               {authMode === "signup" && <><label>Nickname<input required value={nickname} onChange={e => setNickname(e.target.value)} placeholder="Es. VentoAlto" /></label><label>Regione<select value={region} onChange={e => setRegion(e.target.value)}>{["Abruzzo", "Basilicata", "Calabria", "Campania", "Emilia-Romagna", "Friuli Venezia Giulia", "Lazio", "Liguria", "Lombardia", "Marche", "Molise", "Piemonte", "Puglia", "Sardegna", "Sicilia", "Toscana", "Trentino-Alto Adige", "Umbria", "Valle d'Aosta", "Veneto"].map(x => <option key={x}>{x}</option>)}</select></label></>}
               <label><span>Email</span><input required type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="nome@email.it" /></label><label>Password<input required minLength="8" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Almeno 8 caratteri" /></label>
               <button className="primary-btn full" type="submit">{authMode === "signup" ? <><Mail size={17} /> Crea account</> : "Accedi"}</button><small>La registrazione richiede la conferma dell'indirizzo email. Le password sono gestite da Supabase Auth.</small>
-            </form> : <div className="profile-card"><div className="avatar large">{(profile?.nickname || "P").slice(0, 1).toUpperCase()}</div><h3>{profile?.nickname || "Pilota"}</h3><p>{profile?.region || "Italia"}</p><span className="role-label"><Shield size={14} /> {profile?.role || "pilota"}</span><p className="muted">{session.user.email}</p><button className="outline-btn" onClick={logout}>Esci dall'account</button></div>}
+            </form> : <div className="profile-card"><div className="avatar large">{(avatarPreview || profile?.avatar_url) ? <img src={avatarPreview || profile.avatar_url} alt="Foto profilo" /> : (profile?.nickname || "P").slice(0, 1).toUpperCase()}</div>{editingProfile ? <form className="profile-edit-form" onSubmit={saveProfile}><h3>Modifica profilo</h3><label>Nickname<input required minLength="2" maxLength="35" value={nickname} onChange={e => setNickname(e.target.value)} /></label><label>Regione<select value={region} onChange={e => setRegion(e.target.value)}>{["Abruzzo", "Basilicata", "Calabria", "Campania", "Emilia-Romagna", "Friuli Venezia Giulia", "Lazio", "Liguria", "Lombardia", "Marche", "Molise", "Piemonte", "Puglia", "Sardegna", "Sicilia", "Toscana", "Trentino-Alto Adige", "Umbria", "Valle d'Aosta", "Veneto"].map(x => <option key={x}>{x}</option>)}</select></label><label>Foto profilo (JPG, PNG, WebP · massimo 5 MB)<input type="file" accept="image/jpeg,image/png,image/webp" onChange={e => pickAvatar(e.target.files?.[0])} /></label><small>La foto sarà visibile agli altri piloti nella community quando condividi la posizione.</small><div className="profile-edit-actions"><button className="primary-btn" type="submit" disabled={profileSaving}>{profileSaving ? "Salvataggio..." : "Salva modifiche"}</button><button className="outline-btn" type="button" disabled={profileSaving} onClick={() => { setEditingProfile(false); setNickname(profile?.nickname || ""); setRegion(profile?.region || "Veneto"); setAvatarFile(null); setAvatarPreview(null); }}>Annulla</button></div></form> : <><h3>{profile?.nickname || "Pilota"}</h3><p>{profile?.region || "Italia"}</p><span className="role-label"><Shield size={14} /> {profile?.role || "pilota"}</span><p className="muted">{session.user.email}</p><button className="primary-btn" onClick={() => { setNickname(profile?.nickname || ""); setRegion(profile?.region || "Veneto"); setEditingProfile(true); }}>Modifica profilo</button><button className="outline-btn" onClick={logout}>Esci dall'account</button></>}</div>}
           </>}
           {status && <div className="notice">{status}</div>}
         </section>
