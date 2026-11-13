@@ -3,9 +3,10 @@ import { createRoot } from "react-dom/client";
 import { createClient } from "@supabase/supabase-js";
 import { MapContainer, TileLayer, Marker, Popup, Tooltip, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
-import { Wind, Map as MapIcon, Users, UserCircle, Plane, Square, LogOut, Shield, Mail, LocateFixed, Clock3, Gauge, Route, Menu, X, BookOpen, Share2, Maximize2, CalendarDays, MapPin } from "lucide-react";
+import { Wind, Map as MapIcon, Users, UserCircle, Plane, Square, LogOut, Shield, Mail, LocateFixed, Clock3, Gauge, Route, Menu, X, BookOpen, Share2, Maximize2, CalendarDays, MapPin, Wrench } from "lucide-react";
 import "leaflet/dist/leaflet.css";
 import "./styles.css";
+import Equipment from "./Equipment.jsx";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -265,6 +266,7 @@ function App() {
         <button className={tab === "pilots" ? "nav-active" : ""} onClick={() => { setTab("pilots"); setMenuOpen(false); }}><Users size={17} /> Piloti</button>
         <button className={tab === "profile" ? "nav-active" : ""} onClick={() => { setTab("profile"); setMenuOpen(false); }}><UserCircle size={17} /> Profilo</button>
         <button className={tab === "logbook" ? "nav-active" : ""} onClick={() => { setTab("logbook"); setMenuOpen(false); loadLogbook(); }}><BookOpen size={17} /> Logbook</button>
+        <button className={tab === "equipment" ? "nav-active" : ""} onClick={() => { setTab("equipment"); setMenuOpen(false); }}><Wrench size={17} /> Attrezzatura</button>
       </nav>
       <div className="header-right">{session ? <><span className="signed-in">{profile?.nickname || session.user.email}</span><button className="icon-btn" onClick={logout} title="Esci"><LogOut size={18} /></button></> : <button className="small-primary" onClick={() => setTab("profile")}>Accedi</button>}</div>
     </header>
@@ -297,6 +299,7 @@ function App() {
               </article>;
             })}</div>}
           </>}
+          {tab === "equipment" && <Equipment supabase={supabase} userId={session?.user?.id} onStatus={setStatus} />}
           {tab === "profile" && <><div className="panel-heading"><div><div className="eyebrow dark">AREA PERSONALE</div><h2>Il tuo profilo</h2><p>Registrati gratuitamente per entrare nella community.</p></div><UserCircle /></div>
             {!session ? <form className="auth-form" onSubmit={handleAuth}><div className="auth-switch"><button type="button" className={authMode === "signup" ? "selected" : ""} onClick={() => setAuthMode("signup")}>Registrati</button><button type="button" className={authMode === "login" ? "selected" : ""} onClick={() => setAuthMode("login")}>Accedi</button></div>
               {authMode === "signup" && <><label>Nickname<input required value={nickname} onChange={e => setNickname(e.target.value)} placeholder="Es. VentoAlto" /></label><label>Regione<select value={region} onChange={e => setRegion(e.target.value)}>{["Abruzzo", "Basilicata", "Calabria", "Campania", "Emilia-Romagna", "Friuli Venezia Giulia", "Lazio", "Liguria", "Lombardia", "Marche", "Molise", "Piemonte", "Puglia", "Sardegna", "Sicilia", "Toscana", "Trentino-Alto Adige", "Umbria", "Valle d'Aosta", "Veneto"].map(x => <option key={x}>{x}</option>)}</select></label></>}
