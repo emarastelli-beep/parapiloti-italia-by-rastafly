@@ -51,10 +51,21 @@ function airborneFeatures(points, map) {
       rail.push({type:"Feature",geometry:{type:"Polygon",coordinates:[[...ring,ring[0]]]},properties:{base:Math.max(0,Math.min(h0,h1)-5),top:Math.max(h0,h1)+2}});
     }
   }
-  for(let i=2;i<points.length-1;i+=3) {
-    const p=points[i], alt=Number(p.altitude_m);
-    if (p.altitude_m == null || !Number.isFinite(alt)) continue;
-    posts.push({type:"Feature",geometry:{type:"Polygon",coordinates:[square(Number(p.lng),Number(p.lat),5)]},properties:{top:Math.max(2,alt-samples[i])}});
+  // Dense, nearly wall-like curtain: ~10x as many posts as before.
+  for (let i = 0; i < points.length - 1; i++) {
+    const a = points[i], b = points[i + 1];
+    if (a.altitude_m == null || b.altitude_m == null) continue;
+    for (let j = 0; j < 3; j++) {
+      const t = j / 3;
+      const lat = Number(a.lat) + (Number(b.lat) - Number(a.lat)) * t;
+      const lng = Number(a.lng) + (Number(b.lng) - Number(a.lng)) * t;
+      const alt = Number(a.altitude_m) + (Number(b.altitude_m) - Number(a.altitude_m)) * t;
+      const terrain = samples[i] + (samples[i + 1] - samples[i]) * t;
+      if (![lat, lng, alt, terrain].every(Number.isFinite)) continue;
+      posts.push({ type: "Feature",
+        geometry: { type: "Polygon", coordinates: [square(lng, lat, 3.5)] },
+        properties: { top: Math.max(2, alt - terrain) } });
+    }
   }
   return {rail:{type:"FeatureCollection",features:rail},posts:{type:"FeatureCollection",features:posts},sampled};
 }
@@ -62,7 +73,7 @@ function airborneFeatures(points, map) {
 export default function FlightTerrain3D({ points, activeIndex }) {
   const container = useRef(null);
   const mapRef = useRef(null);
-  const markerRef = useRef(null);
+
   const [message, setMessage] = useState("");
   const valid = (points || []).filter(p => Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lng)) && Math.abs(Number(p.lat)) <= 90 && Math.abs(Number(p.lng)) <= 180);
 
@@ -131,6 +142,9 @@ export default function FlightTerrain3D({ points, activeIndex }) {
         map.once("idle",refresh);
         map.on("moveend",refresh);
       }
+      map.addSource("flight-chart-selection", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+      map.addLayer({ id: "flight-chart-selection", type: "circle", source: "flight-chart-selection",
+        paint: { "circle-radius": 7, "circle-color": "#ff9c22", "circle-stroke-color": "#ffffff", "circle-stroke-width": 2 } });
       new maplibregl.Marker({ color: "#13a879" }).setLngLat(coords[0]).addTo(map);
       new maplibregl.Marker({ color: "#d9473e" }).setLngLat(coords[coords.length - 1]).addTo(map);
       map.fitBounds(boundsFor(valid), { padding: 75, maxZoom: 14, pitch: 65, bearing: -25, duration: 0 });
@@ -143,19 +157,20 @@ export default function FlightTerrain3D({ points, activeIndex }) {
     map.on("error", event => {
       if (event?.error) setMessage("Alcune porzioni del rilievo potrebbero non essere disponibili. Verifica la connessione.");
     });
-    return () => { canvas.removeEventListener("webglcontextlost", onContextLost); mapRef.current = null; markerRef.current?.remove(); markerRef.current = null; try { map.remove(); } catch (_) { /* cleanup */ } };
+    return () => { canvas.removeEventListener("webglcontextlost", onContextLost); mapRef.current = null; try { map.remove(); } catch (_) { /* cleanup */ } };
   }, [points]);
 
+  // Update selection without creating or destroying MapLibre Marker instances.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || activeIndex == null || !valid[activeIndex]) {
-      markerRef.current?.remove();
-      markerRef.current = null;
-      return;
-    }
-    const p = valid[activeIndex];
-    if (!markerRef.current) markerRef.current = new maplibregl.Marker({ color: "#f3b025" }).addTo(map);
-    markerRef.current.setLngLat([Number(p.lng), Number(p.lat)]);
+    if (!map || !map.isStyleLoaded() || !map.getSource("flight-chart-selection")) return;
+    const p = activeIndex == null ? null : valid[activeIndex];
+    const coordinates = p && Number.isFinite(Number(p.lng)) && Number.isFinite(Number(p.lat))
+      ? [Number(p.lng), Number(p.lat)] : null;
+    map.getSource("flight-chart-selection").setData({
+      type: "FeatureCollection",
+      features: coordinates ? [{ type: "Feature", geometry: { type: "Point", coordinates }, properties: {} }] : []
+    });
   }, [activeIndex, points]);
 
   if (valid.length < 2) return <div className="flight-map-empty">Servono almeno due punti GPS per la visualizzazione 3D.</div>;
