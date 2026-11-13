@@ -333,3 +333,18 @@ footer{background:#081d2d;border-top:2px solid #5ebbe5;color:#c1d9e6;letter-spac
 .log-delete-modal:hover{background:#fde9e5}
 .flight-log-card{position:relative}
 @media(max-width:560px){.log-delete{width:36px;height:36px}}
+
+
+/* Map layers: street, satellite and aeronautical */
+.map-wrap{position:relative}
+.map-layer-controls{position:absolute;z-index:1000;top:12px;left:12px;display:flex;gap:5px;max-width:calc(100% - 24px);padding:5px;border:1px solid #c8dce8;border-radius:12px;background:#fafdffed;box-shadow:0 3px 12px #092b4026;backdrop-filter:blur(8px)}
+.map-layer-controls button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:36px;padding:7px 10px;border:1px solid transparent;border-radius:8px;background:transparent;color:#24475d;font:700 11px 'DM Sans',sans-serif;cursor:pointer;white-space:nowrap}
+.map-layer-controls button.active{background:#123b58;color:#fff;border-color:#2d789e;box-shadow:0 2px 7px #092b4030}
+.aviation-layer-notice{position:absolute;z-index:900;left:12px;right:12px;bottom:48px;display:flex;flex-direction:column;gap:4px;padding:10px 12px;border:1px solid #e5c98a;border-radius:10px;background:#fff9e9ed;color:#654b17;box-shadow:0 3px 12px #092b4020;backdrop-filter:blur(6px);font-size:11px;line-height:1.4;pointer-events:none}
+.aviation-layer-notice b{font-size:12px}
+@media(max-width:560px){
+ .map-layer-controls{top:8px;left:8px;right:8px;max-width:none;justify-content:stretch;gap:3px;padding:4px}
+ .map-layer-controls button{flex:1;min-width:0;gap:4px;padding:7px 5px;font-size:10px}
+ .map-layer-controls button svg{width:13px;height:13px}
+ .aviation-layer-notice{left:8px;right:8px;bottom:42px;padding:8px 10px;font-size:10px}
+}
