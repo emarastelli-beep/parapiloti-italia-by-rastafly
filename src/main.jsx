@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { createClient } from "@supabase/supabase-js";
-import { MapContainer, TileLayer, Marker, Popup, Tooltip, Polyline, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, Tooltip, Polyline, GeoJSON, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import { Wind, Map as MapIcon, Users, UserCircle, Plane, Square, LogOut, Shield, Mail, LocateFixed, Clock3, Gauge, Route, Menu, X, BookOpen, Share2, Maximize2, Trash2, CalendarDays, MapPin, Wrench } from "lucide-react";
 import "leaflet/dist/leaflet.css";
@@ -33,6 +33,71 @@ function CenterMapButton({ ownPosition }) {
   return <button className="center-map-btn" onClick={() => map.setView([ownPosition.lat, ownPosition.lng], Math.max(map.getZoom(), 15), { animate: true })} aria-label="Centra sulla mia posizione" title="Centra sulla mia posizione"><LocateFixed size={21} /><span>CENTRA</span></button>;
 }
 
+function airspaceTypeName(type) {
+  const names = {0:"Altro",1:"Area regolamentata (R)",2:"Area pericolosa (D)",3:"Area proibita (P)",4:"CTR",5:"TMZ",6:"RMZ",7:"TMA",8:"TRA",9:"TSA",10:"FIR",11:"UIR",12:"ADIZ",13:"ATZ",14:"MATZ",15:"Aerovia",16:"Rotta addestramento militare",17:"Area di allerta",18:"Area di avvertimento",19:"Area protetta",20:"HTZ",21:"Settore volo a vela",22:"Punto transponder",23:"TIZ",24:"TIA",25:"Area addestramento militare",26:"CTA",27:"Settore ACC",28:"Attività sportiva/aeronautica",29:"Restrizione sorvolo a bassa quota",30:"Rotta militare",31:"Rotta alimentazione TSA/TRA",32:"Settore VFR",33:"Settore FIS",34:"LTA",35:"UTA",36:"MCTR"};
+  return names[Number(type)] || `Tipo spazio aereo ${type ?? "non indicato"}`;
+}
+
+function airspaceLimit(limit) {
+  if (!limit || limit.value == null) return "Non disponibile";
+  const value = Number(limit.value);
+  const unit = Number(limit.unit);
+  const datum = Number(limit.referenceDatum);
+  const ref = datum === 0 ? "GND" : datum === 1 ? "AMSL" : datum === 2 ? "STD" : "";
+  if (unit === 6) return `FL${String(Math.round(value)).padStart(3,"0")}`;
+  if (unit === 1) return `${Math.round(value).toLocaleString("it-IT")} ft${ref ? " " + ref : ""}`;
+  if (unit === 0) return `${Math.round(value).toLocaleString("it-IT")} m${ref ? " " + ref : ""}`;
+  return `${value} ${ref}`.trim();
+}
+
+function airspacePopup(feature) {
+  const p = feature?.properties || {};
+  const safe = value => String(value ?? "").replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
+  const classCode = typeof p.icaoClass === "number" ? (["A","B","C","D","E","F","G"][p.icaoClass] || "Non assegnata") : (p.icaoClass || "Non indicata");
+  const frequencies = Array.isArray(p.frequencies) ? p.frequencies.map(x => x.value || x.frequency || x.name).filter(Boolean).join(", ") : "";
+  const hours = Array.isArray(p.hoursOfOperation) ? p.hoursOfOperation.map(x => typeof x === "string" ? x : JSON.stringify(x)).join("; ") : (p.hoursOfOperation || "");
+  return `<div class="airspace-popup"><strong>${safe(p.name || "Spazio aereo")}</strong><span>${safe(airspaceTypeName(p.type))} · Classe ${safe(classCode)}</span><span><b>Limite inferiore:</b> ${safe(airspaceLimit(p.lowerLimit))}</span><span><b>Limite superiore:</b> ${safe(airspaceLimit(p.upperLimit))}</span>${frequencies ? `<span><b>Frequenze:</b> ${safe(frequencies)}</span>` : ""}${hours ? `<span><b>Orari:</b> ${safe(hours)}</span>` : ""}<small>Dati OpenAIP · verifica sempre AIP e NOTAM ufficiali</small></div>`;
+}
+
+function AirspaceOverlay({ apiKey }) {
+  const map = useMap();
+  const [boundsKey, setBoundsKey] = useState("");
+  const [collection, setCollection] = useState(null);
+  useMapEvents({ moveend: () => {
+    const b = map.getBounds();
+    setBoundsKey([b.getWest(),b.getSouth(),b.getEast(),b.getNorth()].map(v => v.toFixed(3)).join(","));
+  }});
+  useEffect(() => {
+    const b = map.getBounds();
+    setBoundsKey([b.getWest(),b.getSouth(),b.getEast(),b.getNorth()].map(v => v.toFixed(3)).join(","));
+  }, [map]);
+  useEffect(() => {
+    if (!apiKey || !boundsKey || map.getZoom() < 7) { setCollection(null); return; }
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const url = `https://api.core.openaip.net/api/airspaces?bbox=${encodeURIComponent(boundsKey)}&page=1&limit=100`;
+        const response = await fetch(url, { headers: { "x-openaip-api-key": apiKey, "Accept": "application/json" }, signal: controller.signal });
+        if (!response.ok) throw new Error(`OpenAIP HTTP ${response.status}`);
+        const payload = await response.json();
+        const items = Array.isArray(payload) ? payload : (payload.items || []);
+        const features = items.filter(item => item?.geometry?.type && item?.geometry?.coordinates).map(item => ({ type:"Feature", geometry:item.geometry, properties:item }));
+        setCollection({ type:"FeatureCollection", features });
+      } catch (error) {
+        if (error.name !== "AbortError") console.warn("OpenAIP airspaces:", error);
+      }
+    }, 450);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [apiKey, boundsKey, map]);
+  if (!collection?.features?.length) return null;
+  const palette = {1:"#d94841",2:"#e28b28",3:"#bd2525",4:"#2676b8",7:"#347db5",8:"#c06a32",9:"#8a5ab5",13:"#2676b8",14:"#8a5ab5",17:"#d2a52b",18:"#c77c35",25:"#8a5ab5",26:"#347db5",28:"#249477"};
+  return <GeoJSON key={boundsKey} data={collection} style={feature => {
+    const type = Number(feature?.properties?.type);
+    const color = palette[type] || "#647f91";
+    return { color, weight:2, opacity:.9, fillColor:color, fillOpacity:.13 };
+  }} onEachFeature={(feature, layer) => layer.bindPopup(airspacePopup(feature), { maxWidth:300 })} />;
+}
+
 function MapView({ pilots, ownPosition, trail, mapLayer }) {
   const center = ownPosition ? [ownPosition.lat, ownPosition.lng] : [42.8, 12.5];
   const openAipKey = import.meta.env.VITE_OPENAIP_API_KEY;
@@ -48,6 +113,7 @@ function MapView({ pilots, ownPosition, trail, mapLayer }) {
       maxZoom={14}
       zIndex={450}
     />}
+    {mapLayer === "aviation" && openAipKey && <AirspaceOverlay apiKey={openAipKey} />}
     <FollowPilot ownPosition={ownPosition} />
     <CenterMapButton ownPosition={ownPosition} />
     {trail.length > 1 && <Polyline positions={trail.map(p => [p.lat, p.lng])} pathOptions={{ color: "#e05b35", weight: 2.5, opacity: 0.95, dashArray: "5 7", lineCap: "round", lineJoin: "round" }} />}
