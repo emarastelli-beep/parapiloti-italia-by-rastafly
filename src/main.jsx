@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { lazy, Suspense, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { createClient } from "@supabase/supabase-js";
 import { MapContainer, TileLayer, Marker, Popup, Tooltip, Polyline, useMap } from "react-leaflet";
@@ -7,7 +7,7 @@ import { Wind, Map as MapIcon, Users, UserCircle, Plane, Square, LogOut, Shield,
 import "leaflet/dist/leaflet.css";
 import "./styles.css";
 import Equipment from "./Equipment.jsx";
-import FlightTerrain3D from "./FlightTerrain3D.jsx";
+const FlightTerrain3D = lazy(() => import("./FlightTerrain3D.jsx"));
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -418,7 +418,7 @@ function App() {
         <button type="button" className={flightMapMode === "3d" ? "active" : ""} onClick={() => setFlightMapMode("3d")}>Terreno 3D</button>
       </div>
       <div className={flightMapMode === "3d" ? "flight-modal-map flight-modal-map-3d" : "flight-modal-map"}>
-        {flightMapMode === "3d" ? <FlightTerrain3D points={selectedFlight.points || []}/> : <FlightTrackMap points={selectedFlight.points || []}/>}
+        {flightMapMode === "3d" ? <Suspense fallback={<div className="flight-map-empty">Caricamento terreno 3D...</div>}><FlightTerrain3D points={selectedFlight.points || []}/></Suspense> : <FlightTrackMap points={selectedFlight.points || []}/>}
       </div>
       <div className="flight-modal-stats"><span><small>DURATA</small><b>{String(Math.floor((new Date(selectedFlight.ended_at)-new Date(selectedFlight.started_at))/3600000)).padStart(2,"0")}:{String(Math.floor(((new Date(selectedFlight.ended_at)-new Date(selectedFlight.started_at))%3600000)/60000)).padStart(2,"0")}</b></span><span><small>PUNTI GPS</small><b>{(selectedFlight.points || []).length}</b></span><span><small>MEDIA GPS</small><b>{selectedFlight.avg_speed_kmh == null ? "—" : Number(selectedFlight.avg_speed_kmh).toFixed(1) + " km/h"}</b></span><span><small>MAX GPS</small><b>{selectedFlight.max_speed_kmh == null ? "—" : Number(selectedFlight.max_speed_kmh).toFixed(1) + " km/h"}</b></span><span><small>MIN GPS</small><b>{selectedFlight.min_speed_kmh == null ? "—" : Number(selectedFlight.min_speed_kmh).toFixed(1) + " km/h"}</b></span><span><small>CARBURANTE STIMATO</small><b>{selectedFlight.fuel_consumed_l == null ? "—" : Number(selectedFlight.fuel_consumed_l).toFixed(1) + " L"}</b></span></div>
       {!selectedFlight.demo && <button className="primary-btn full" onClick={() => shareFlight(selectedFlight)}><Share2 size={17}/> Condividi volo e traccia</button>}
