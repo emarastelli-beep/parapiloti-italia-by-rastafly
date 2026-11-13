@@ -348,3 +348,12 @@ footer{background:#081d2d;border-top:2px solid #5ebbe5;color:#c1d9e6;letter-spac
  .map-layer-controls button svg{width:13px;height:13px}
  .aviation-layer-notice{left:8px;right:8px;bottom:42px;padding:8px 10px;font-size:10px}
 }
+
+
+/* OpenAIP interactive airspace information popups */
+.airspace-popup{display:flex;flex-direction:column;gap:6px;min-width:190px;color:#17364b;font:12px 'DM Sans',sans-serif;line-height:1.4}
+.airspace-popup>strong{font:800 14px Manrope,sans-serif;color:#123b58}
+.airspace-popup>span{display:block}
+.airspace-popup small{display:block;margin-top:5px;padding-top:6px;border-top:1px solid #d9e7ef;color:#718898;font-size:10px}
+.leaflet-popup-content{margin:12px 14px}
+.leaflet-popup-content-wrapper{border:1px solid #c8dce8;border-radius:12px;box-shadow:0 8px 24px #092b4026}
