@@ -11,9 +11,37 @@ function boundsFor(points) {
   return [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]];
 }
 
-export default function FlightTerrain3D({ points }) {
+function flightRibbon(points, map) {
+  const features = [];
+  for (let i = 0; i < points.length - 1; i += 2) {
+    const a = points[i], b = points[Math.min(i + 1, points.length - 1)];
+    if (a.altitude_m == null || b.altitude_m == null) continue;
+    const groundA = map.queryTerrainElevation([Number(a.lng), Number(a.lat)], { exaggerated: false });
+    const groundB = map.queryTerrainElevation([Number(b.lng), Number(b.lat)], { exaggerated: false });
+    if (!Number.isFinite(groundA) || !Number.isFinite(groundB)) continue;
+    const agl = Math.max(3, (Number(a.altitude_m) - groundA + Number(b.altitude_m) - groundB) / 2);
+    const midLat = (Number(a.lat) + Number(b.lat)) / 2;
+    const cosLat = Math.max(0.1, Math.cos(midLat * Math.PI / 180));
+    const dx = (Number(b.lng) - Number(a.lng)) * cosLat, dy = Number(b.lat) - Number(a.lat);
+    const norm = Math.hypot(dx, dy);
+    if (norm < 1e-10) continue;
+    const width = 7 / 111320;
+    const ox = (-dy / norm) * width / cosLat, oy = (dx / norm) * width;
+    const corners = [
+      [Number(a.lng) + ox, Number(a.lat) + oy],
+      [Number(b.lng) + ox, Number(b.lat) + oy],
+      [Number(b.lng) - ox, Number(b.lat) - oy],
+      [Number(a.lng) - ox, Number(a.lat) - oy]
+    ];
+    features.push({ type: "Feature", geometry: { type: "Polygon", coordinates: [[...corners, corners[0]]] }, properties: { base: Math.max(0, agl - 4), top: agl } });
+  }
+  return { type: "FeatureCollection", features };
+}
+
+export default function FlightTerrain3D({ points, activeIndex }) {
   const container = useRef(null);
   const mapRef = useRef(null);
+  const markerRef = useRef(null);
   const [message, setMessage] = useState("");
   const valid = (points || []).filter(p => Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lng)) && Math.abs(Number(p.lat)) <= 90 && Math.abs(Number(p.lng)) <= 180);
 
@@ -61,6 +89,18 @@ export default function FlightTerrain3D({ points }) {
       map.addLayer({ id: "flight-path-line", type: "line", source: "flight-path", paint: {
         "line-color": "#f36a2c", "line-width": 3.5, "line-opacity": 0.98, "line-dasharray": [2.5, 2.5]
       }, layout: { "line-cap": "round", "line-join": "round" }});
+      map.addSource("flight-airborne", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+      map.addLayer({ id: "flight-airborne-ribbon", type: "fill-extrusion", source: "flight-airborne",
+        paint: { "fill-extrusion-color": "#f36a2c", "fill-extrusion-opacity": 0.94,
+          "fill-extrusion-base": ["get", "base"], "fill-extrusion-height": ["get", "top"] } });
+      const updateElevated = () => {
+        try {
+          const ribbon = flightRibbon(valid, map);
+          if (ribbon.features.length) map.getSource("flight-airborne")?.setData(ribbon);
+        } catch (error) { console.warn("3D flight ribbon:", error); }
+      };
+      map.on("idle", updateElevated);
+      updateElevated();
       new maplibregl.Marker({ color: "#13a879" }).setLngLat(coords[0]).addTo(map);
       new maplibregl.Marker({ color: "#d9473e" }).setLngLat(coords[coords.length - 1]).addTo(map);
       map.fitBounds(boundsFor(valid), { padding: 75, maxZoom: 14, pitch: 65, bearing: -25, duration: 0 });
@@ -70,14 +110,26 @@ export default function FlightTerrain3D({ points }) {
     map.on("error", event => {
       if (event?.error) setMessage("Alcune porzioni del rilievo potrebbero non essere disponibili. Verifica la connessione.");
     });
-    return () => { mapRef.current = null; try { map.remove(); } catch (_) { /* cleanup */ } };
+    return () => { mapRef.current = null; markerRef.current?.remove(); markerRef.current = null; try { map.remove(); } catch (_) { /* cleanup */ } };
   }, [points]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || activeIndex == null || !valid[activeIndex]) {
+      markerRef.current?.remove();
+      markerRef.current = null;
+      return;
+    }
+    const p = valid[activeIndex];
+    if (!markerRef.current) markerRef.current = new maplibregl.Marker({ color: "#f3b025" }).addTo(map);
+    markerRef.current.setLngLat([Number(p.lng), Number(p.lat)]);
+  }, [activeIndex, points]);
 
   if (valid.length < 2) return <div className="flight-map-empty">Servono almeno due punti GPS per la visualizzazione 3D.</div>;
   return <div className="terrain-3d-wrap">
     <div ref={container} className="terrain-3d-map" aria-label="Traccia del volo sulla mappa tridimensionale del terreno" />
     <div className="terrain-3d-hint">Trascina per ruotare · usa i controlli per inclinare e zoomare</div>
     {message && <div className="terrain-3d-notice">{message}</div>}
-    <small className="terrain-3d-disclaimer">Traccia proiettata sul terreno 3D. Le quote reali del volo richiedono dati altimetrici GPS salvati per ciascun punto. Visualizzazione non adatta alla navigazione.</small>
+    <small className="terrain-3d-disclaimer">Traccia arancione tratteggiata sospesa sul terreno quando sono disponibili quota GPS e dati altimetrici del suolo. Altezza indicativa, non utilizzabile per la navigazione.</small>
   </div>;
 }
