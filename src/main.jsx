@@ -192,8 +192,12 @@ function App() {
     navigator.geolocation.getCurrentPosition(async pos => {
       const p = { lat: pos.coords.latitude, lng: pos.coords.longitude, altitude_m: pos.coords.altitude == null ? null : Math.round(pos.coords.altitude), speed_kmh: pos.coords.speed == null ? null : Math.round(pos.coords.speed * 3.6), heading: pos.coords.heading, updated_at: new Date().toISOString() };
       setOwnPosition(p); setTrail([{lat:p.lat,lng:p.lng,time:Date.now()}]); setFlying(true); setStatus("Sessione avviata. Mantieni l'app autorizzata alla posizione.");
+      window.__flightStartedAt = Date.now(); window.__flightSpeeds = p.speed_kmh == null ? [] : [p.speed_kmh]; window.__flightFuelRate = 0; window.__flightEquipmentSnapshot = {};
+      const { data: gear } = await supabase.from("pilot_equipment").select("category,name,model,consumption_lph").eq("user_id", session.user.id).order("created_at", { ascending: true });
+      const paramotor = (gear || []).find(x => x.category === "Paramotore");
+      if (paramotor) { window.__flightFuelRate = Number(paramotor.consumption_lph) || 0; window.__flightEquipmentSnapshot = paramotor; }
       await publishPosition(p);
-      const { data: flightSession, error } = await supabase.from("flight_sessions").insert({ pilot_id: profile?.id || session.user.id }).select("id").single();
+      const { data: flightSession, error } = await supabase.from("flight_sessions").insert({ pilot_id: profile?.id || session.user.id, equipment_snapshot: window.__flightEquipmentSnapshot }).select("id").single();
       if (error || !flightSession) { setStatus("Posizione inviata, ma apertura del logbook non riuscita: " + (error?.message || "sessione non creata")); return; }
       const activeFlightId = flightSession.id;
       setCurrentFlightId(activeFlightId);
@@ -202,6 +206,7 @@ function App() {
       window.__flightWatch = navigator.geolocation.watchPosition(async next => {
         const q = { lat: next.coords.latitude, lng: next.coords.longitude, altitude_m: next.coords.altitude == null ? null : Math.round(next.coords.altitude), speed_kmh: next.coords.speed == null ? null : Math.round(next.coords.speed * 3.6), heading: next.coords.heading, accuracy_m: next.coords.accuracy, updated_at: new Date().toISOString() };
         setOwnPosition(q);
+        if (q.speed_kmh != null && q.speed_kmh >= 0) window.__flightSpeeds = [...(window.__flightSpeeds || []), q.speed_kmh];
         setTrail(prev => {
           const now = Date.now();
           const recent = prev.filter(point => now - point.time <= 60000);
@@ -248,8 +253,18 @@ function App() {
     window.__flightWatch = null; window.__lastSavedTrackPoint = null; setFlying(false); setOwnPosition(null);
     if (supabase && session) {
       await supabase.from("live_positions").delete().eq("user_id", session.user.id);
-      if (currentFlightId) await supabase.from("flight_sessions").update({ ended_at: new Date().toISOString() }).eq("id", currentFlightId).eq("pilot_id", session.user.id);
+      if (currentFlightId) {
+        const endedAt = Date.now();
+        const startedAt = window.__flightStartedAt || endedAt;
+        const durationHours = Math.max(0, (endedAt - startedAt) / 3600000);
+        const speeds = (window.__flightSpeeds || []).filter(v => Number.isFinite(Number(v))).map(Number);
+        const stats = speeds.length ? { avg_speed_kmh: speeds.reduce((a,b) => a+b,0) / speeds.length, max_speed_kmh: Math.max(...speeds), min_speed_kmh: Math.min(...speeds) } : {};
+        const fuel = durationHours * (Number(window.__flightFuelRate) || 0);
+        const { error } = await supabase.from("flight_sessions").update({ ended_at: new Date(endedAt).toISOString(), ...stats, fuel_consumed_l: fuel }).eq("id", currentFlightId).eq("pilot_id", session.user.id);
+        if (error) setStatus("Volo terminato, ma statistiche non salvate: " + error.message);
+      }
     }
+    window.__flightStartedAt = null; window.__flightSpeeds = []; window.__flightFuelRate = 0; window.__flightEquipmentSnapshot = {};
     setCurrentFlightId(null);
     setStatus("Volo terminato e salvato nel tuo logbook.");
     loadLogbook();
