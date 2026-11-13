@@ -20,17 +20,25 @@ function createAirborneLayer(points) {
     if (a.altitude_m == null || b.altitude_m == null) continue;
     const altA = Number(a.altitude_m), altB = Number(b.altitude_m);
     if (!Number.isFinite(altA) || !Number.isFinite(altB)) continue;
-    // Split each leg into alternating visible and invisible pieces (dashed 3D track).
+    // A genuine wide 3D ribbon (triangles), not 1-pixel WebGL lines.
+    // Each edge uses its own GPS MSL altitude; dash gaps are real gaps.
     const steps = 8;
     for (let k = 0; k < steps; k += 2) {
-      const interpolate = t => {
+      const vertex = t => {
         const lng = Number(a.lng) + (Number(b.lng) - Number(a.lng)) * t;
         const lat = Number(a.lat) + (Number(b.lat) - Number(a.lat)) * t;
         const altitude = altA + (altB - altA) * t;
-        const p = maplibregl.MercatorCoordinate.fromLngLat({ lng, lat }, altitude);
-        return [p.x, p.y, p.z];
+        return maplibregl.MercatorCoordinate.fromLngLat({ lng, lat }, altitude);
       };
-      vertices.push(...interpolate(k / steps), ...interpolate((k + 1) / steps));
+      const p = vertex(k / steps), q = vertex((k + 1) / steps);
+      const dx = q.x - p.x, dy = q.y - p.y;
+      const len = Math.hypot(dx, dy);
+      if (len < 1e-12) continue;
+      const width = p.meterInMercatorCoordinateUnits() * 11;
+      const ox = -dy / len * width, oy = dx / len * width;
+      const l0 = [p.x + ox, p.y + oy, p.z], r0 = [p.x - ox, p.y - oy, p.z];
+      const l1 = [q.x + ox, q.y + oy, q.z], r1 = [q.x - ox, q.y - oy, q.z];
+      vertices.push(...l0, ...r0, ...l1, ...l1, ...r0, ...r1);
     }
   }
   return {
@@ -68,13 +76,13 @@ function createAirborneLayer(points) {
       if (!this.vertexCount || !this.program) return;
       const matrix = options?.defaultProjectionData?.mainMatrix || options?.modelViewProjectionMatrix || options;
       if (!matrix || matrix.length !== 16) return;
+      gl.enable(gl.DEPTH_TEST);
       gl.useProgram(this.program);
       gl.uniformMatrix4fv(this.matrixLocation, false, matrix);
       gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
       gl.enableVertexAttribArray(this.positionLocation);
       gl.vertexAttribPointer(this.positionLocation, 3, gl.FLOAT, false, 0, 0);
-      gl.lineWidth(2);
-      gl.drawArrays(gl.LINES, 0, this.vertexCount);
+      gl.drawArrays(gl.TRIANGLES, 0, this.vertexCount);
       gl.disableVertexAttribArray(this.positionLocation);
       gl.bindBuffer(gl.ARRAY_BUFFER, null);
     },
@@ -132,12 +140,14 @@ export default function FlightTerrain3D({ points, activeIndex }) {
         if (typeof map.setTerrain === "function") map.setTerrain({ source: "terrain", exaggeration: 1.35 });
       } catch (error) { setMessage("Il terreno 3D non è disponibile su questo browser: " + error.message); }
       try {
+      if (!valid.some(p => p.altitude_m != null)) {
       map.addSource("flight-path", { type: "geojson", data: {
         type: "Feature", geometry: { type: "LineString", coordinates: coords }, properties: {}
       }});
       map.addLayer({ id: "flight-path-line", type: "line", source: "flight-path", paint: {
         "line-color": "#f36a2c", "line-width": 3.5, "line-opacity": 0.98, "line-dasharray": [2.5, 2.5]
       }, layout: { "line-cap": "round", "line-join": "round" }});
+      }
       if (valid.some(p => p.altitude_m != null)) {
         try { map.addLayer(createAirborneLayer(valid)); }
         catch (error) { console.warn("Traccia 3D in quota non disponibile", error); }
