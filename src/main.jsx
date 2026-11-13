@@ -120,7 +120,7 @@ function App() {
   function flightGpx(flight) {
     const points = (flight.points || []).filter(p => Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lng)));
     const track = points.map(p => `      <trkpt lat="${Number(p.lat)}" lon="${Number(p.lng)}"><time>${new Date(p.recorded_at || flight.started_at).toISOString()}</time></trkpt>`).join("\n");
-    return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="PILOT-ADVISOR · RASTA7212" xmlns="http://www.topografix.com/GPX/1/1"><metadata><name>Volo ParaPiloti Italia</name><time>${new Date(flight.started_at).toISOString()}</time></metadata><trk><name>Traccia GPS</name><trkseg>\n${track}\n    </trkseg></trk></gpx>`;
+    return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="PILOT ADVISOR · RASTA7212" xmlns="http://www.topografix.com/GPX/1/1"><metadata><name>Volo ParaPiloti Italia</name><time>${new Date(flight.started_at).toISOString()}</time></metadata><trk><name>Traccia GPS</name><trkseg>\n${track}\n    </trkseg></trk></gpx>`;
   }
 
   function exportFlightGpx(flight) {
@@ -274,7 +274,7 @@ function App() {
   const activePilots = pilots.filter(p => !p.demo).length;
   return <div className={flying ? "app-shell flight-mode" : "app-shell"}>
     <header className="topbar">
-      <div className="brand"><div className="brand-mark" aria-label="Pilot-Advisor"><svg viewBox="0 0 64 64" role="img" aria-hidden="true"><circle cx="32" cy="32" r="28" fill="#0b2032" stroke="#d9edf7" strokeWidth="2"/><circle cx="32" cy="32" r="22" fill="none" stroke="#55b8e6" strokeWidth="1.5" strokeDasharray="3 3"/><path d="M10 25 Q32 5 54 25 Q32 17 10 25Z" fill="#f8fbfd" stroke="#55b8e6" strokeWidth="1.5"/><path d="M17 26L32 43L47 26M32 27V48" fill="none" stroke="#f8fbfd" strokeWidth="1.8" strokeLinecap="round"/><path d="M32 13V7M51 32H57M32 51V57M7 32H13" stroke="#83c9ed" strokeWidth="2" strokeLinecap="round"/><path d="M32 29L36 36L32 34L28 36Z" fill="#83c9ed"/></svg></div><div className="brand-wordmark"><strong>PILOT-<span>ADVISOR</span></strong><small className="brand-creator">BY RASTA7212</small></div></div>
+      <div className="brand"><div className="brand-mark" aria-label="Pilot-Advisor"><svg viewBox="0 0 64 64" role="img" aria-hidden="true"><circle cx="32" cy="32" r="28" fill="#0b2032" stroke="#d9edf7" strokeWidth="2"/><circle cx="32" cy="32" r="22" fill="none" stroke="#55b8e6" strokeWidth="1.5" strokeDasharray="3 3"/><path d="M10 25 Q32 5 54 25 Q32 17 10 25Z" fill="#f8fbfd" stroke="#55b8e6" strokeWidth="1.5"/><path d="M17 26L32 43L47 26M32 27V48" fill="none" stroke="#f8fbfd" strokeWidth="1.8" strokeLinecap="round"/><path d="M32 13V7M51 32H57M32 51V57M7 32H13" stroke="#83c9ed" strokeWidth="2" strokeLinecap="round"/><path d="M32 29L36 36L32 34L28 36Z" fill="#83c9ed"/></svg></div><div className="brand-wordmark"><strong>PILOT <span>ADVISOR</span></strong><small className="brand-creator">BY RASTA7212</small></div></div>
       <button className="icon-btn mobile-menu" onClick={() => setMenuOpen(!menuOpen)} aria-label="Menu">{menuOpen ? <X /> : <Menu />}</button>
       <nav className={menuOpen ? "nav open" : "nav"}>
         <button className={tab === "map" ? "nav-active" : ""} onClick={() => { setTab("map"); setMenuOpen(false); }}><MapIcon size={17} /> Live GPS</button>
@@ -333,7 +333,7 @@ function App() {
     </main>
     {selectedFlight && <div className="flight-modal-backdrop" onClick={() => setSelectedFlight(null)}><section className="flight-modal" onClick={e => e.stopPropagation()}>
       <button className="modal-close" onClick={() => setSelectedFlight(null)} aria-label="Chiudi">×</button>
-      <div className="eyebrow dark">PILOT-ADVISOR · BY RASTA7212</div><h2>Il mio volo</h2>
+      <div className="eyebrow dark">PILOT ADVISOR · BY RASTA7212</div><h2>Il mio volo</h2>
       <b>{new Date(selectedFlight.started_at).toLocaleDateString("it-IT", { dateStyle:"full" })}</b>
       <p>{new Date(selectedFlight.started_at).toLocaleTimeString("it-IT", {hour:"2-digit",minute:"2-digit"})} – {new Date(selectedFlight.ended_at).toLocaleTimeString("it-IT", {hour:"2-digit",minute:"2-digit"})}</p>
       <div className="flight-modal-map"><FlightTrackMap points={selectedFlight.points || []}/></div>
@@ -342,7 +342,7 @@ function App() {
       <button className="outline-btn full" onClick={() => exportFlightGpx(selectedFlight)}><Route size={17}/> Esporta traccia GPX</button>
       <small className="muted">La traccia è un riepilogo GPS indicativo, non uno strumento di navigazione.</small>
     </section></div>}
-    <footer><span>© {new Date().getFullYear()} PILOT-ADVISOR · RASTA7212</span><span>Prototipo tecnico · Non è un dispositivo di sicurezza aeronautica</span></footer>
+    <footer><span>© {new Date().getFullYear()} PILOT ADVISOR · RASTA7212</span><span>Prototipo tecnico · Non è un dispositivo di sicurezza aeronautica</span></footer>
   </div>;
 }
 
