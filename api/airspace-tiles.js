@@ -19,10 +19,9 @@ export default async function handler(req, res) {
 
   try {
     const url = new URL(`https://a.api.tiles.openaip.net/api/data/openaip/${z}/${x}/${y}.png`);
-    // The Tiles API documents the API key as the apiKey query parameter.
-    // Keep the key server-side: this URL is fetched only by the Vercel function.
-    url.searchParams.set("apiKey", apiKey);
-    const upstream = await fetch(url, { headers: { "Accept": "image/png" } });
+    const upstream = await fetch(url, {
+      headers: { "x-openaip-api-key": apiKey, "Accept": "image/png" }
+    });
     if (!upstream.ok) {
       const details = await upstream.text();
       console.error("OpenAIP tile response:", upstream.status, details.slice(0, 500));
