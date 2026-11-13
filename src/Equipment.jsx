@@ -45,7 +45,7 @@ export default function Equipment({ supabase, userId, onStatus }) {
       user_id: userId, equipment_id: taskForm.equipment_id || null, title: taskForm.title,
       interval_hours: taskForm.interval_hours ? Number(taskForm.interval_hours) : null,
       interval_days: taskForm.interval_days ? Number(taskForm.interval_days) : null, notes: taskForm.notes,
-      next_due_flight_hours: taskForm.interval_hours ? Number(taskForm.interval_hours) : null,
+      next_due_flight_hours: taskForm.interval_hours ? totalHours + Number(taskForm.interval_hours) : null,
       next_due_at: taskForm.interval_days ? new Date(Date.now() + Number(taskForm.interval_days) * 86400000).toISOString() : null
     });
     if (error) onStatus?.(error.message);
