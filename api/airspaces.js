@@ -31,10 +31,13 @@ export default async function handler(req, res) {
     // Richieste più leggere e affidabili durante gli spostamenti della mappa.
     url.searchParams.set("limit", "100");
 
+    // Use the documented apiKey query authentication for the Core API.
+    // The key remains server-side and is never sent to the browser.
+    url.searchParams.set("apiKey", apiKey);
     const upstream = await fetch(url, {
       headers: {
-        "x-openaip-api-key": apiKey,
-        "Accept": "application/json"
+        "Accept": "application/json",
+        "User-Agent": "PilotAdvisor/1.0"
       }
     });
     const body = await upstream.text();
@@ -44,7 +47,7 @@ export default async function handler(req, res) {
       return res.status(502).json({
         error: "OpenAIP non ha completato la richiesta.",
         upstreamStatus: upstream.status,
-        details: body.slice(0, 300)
+        details: upstream.status === 403 ? "OpenAIP ha rifiutato la richiesta (403). Verificare che la chiave API sia valida e autorizzata per Core API." : body.slice(0, 180)
       });
     }
 
