@@ -70,8 +70,8 @@ function FlightTrackMap({ points }) {
   const coords = valid.map(p => [Number(p.lat), Number(p.lng)]);
   const bounds = L.latLngBounds(coords);
   return <MapContainer bounds={bounds} boundsOptions={{ padding: [18,18] }} scrollWheelZoom={false} dragging={false} zoomControl={false} doubleClickZoom={false} touchZoom={false} className="flight-track-map">
-    <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-    <Polyline positions={coords} pathOptions={{color:"#e05b35",weight:3,lineCap:"round",lineJoin:"round"}} />
+    <TileLayer attribution='Tiles &copy; Esri, HERE, Garmin, OpenStreetMap contributors' url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}" />
+    <Polyline positions={coords} pathOptions={{color:"#f36a2c",weight:3,dashArray:"7 8",lineCap:"round",lineJoin:"round",opacity:0.95}} />
   </MapContainer>;
 }
 
