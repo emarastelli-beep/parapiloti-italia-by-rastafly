@@ -372,3 +372,12 @@ footer{background:#081d2d;border-top:2px solid #5ebbe5;color:#c1d9e6;letter-spac
 .terrain-3d-notice { margin-top:8px; background:#fff4e4; padding:9px; border-radius:8px; font-size:12px; color:#81500d; }
 .terrain-3d-disclaimer { display:block; padding:9px 2px 2px; color:#526d7e; font-size:12px; line-height:1.4; }
 @media(max-width:600px) { .terrain-3d-map { height:330px; } .terrain-3d-wrap { min-height:330px; } .flight-modal-map-3d { min-height:340px; } .terrain-3d-hint { font-size:10px; max-width:65%; } }
+
+
+.logbook-demo-panel { display:flex; gap:18px; justify-content:space-between; align-items:center; padding:16px 18px; margin:8px 0 22px; border:1px solid #b9dbe8; background:#eaf5fa; border-radius:14px; }
+.logbook-demo-panel div { display:flex; flex-direction:column; gap:4px; }
+.logbook-demo-panel b { color:#123b56; font-size:15px; }
+.logbook-demo-panel span { color:#55758b; font-size:12px; line-height:1.5; }
+.logbook-demo-panel button { flex-shrink:0; }
+.demo-flight-label { padding:8px 12px; border-radius:8px; background:#fff4db; color:#76511b; font-size:12px; font-weight:700; }
+@media(max-width:640px) { .logbook-demo-panel { flex-direction:column; align-items:stretch; } .logbook-demo-panel button { justify-content:center; } }
