@@ -3,7 +3,7 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 const TERRAIN_URL = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png";
-const OSM_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+const TOPO_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}";
 
 function boundsFor(points) {
   const lngs = points.map(p => Number(p.lng));
@@ -31,10 +31,10 @@ export default function FlightTerrain3D({ points }) {
       style: {
         version: 8,
         sources: {
-          osm: { type: "raster", tiles: [OSM_URL], tileSize: 256, attribution: "© OpenStreetMap contributors" },
+          topo: { type: "raster", tiles: [TOPO_URL], tileSize: 256, attribution: "Tiles © Esri, HERE, Garmin, OpenStreetMap contributors" },
           terrain: { type: "raster-dem", tiles: [TERRAIN_URL], tileSize: 256, maxzoom: 15, encoding: "terrarium", attribution: "Terrain DEM: AWS Terrain Tiles" }
         },
-        layers: [{ id: "base-map", type: "raster", source: "osm" }],
+        layers: [{ id: "base-map", type: "raster", source: "topo" }],
         // Activate the DEM after the style is ready, to avoid startup errors.
       },
       center: coords[0],
@@ -59,7 +59,7 @@ export default function FlightTerrain3D({ points }) {
         type: "Feature", geometry: { type: "LineString", coordinates: coords }, properties: {}
       }});
       map.addLayer({ id: "flight-path-line", type: "line", source: "flight-path", paint: {
-        "line-color": "#ff623a", "line-width": 5, "line-opacity": 0.95
+        "line-color": "#f36a2c", "line-width": 3.5, "line-opacity": 0.98, "line-dasharray": [2.5, 2.5]
       }, layout: { "line-cap": "round", "line-join": "round" }});
       new maplibregl.Marker({ color: "#13a879" }).setLngLat(coords[0]).addTo(map);
       new maplibregl.Marker({ color: "#d9473e" }).setLngLat(coords[coords.length - 1]).addTo(map);
