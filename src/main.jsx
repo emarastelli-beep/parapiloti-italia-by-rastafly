@@ -138,6 +138,8 @@ function App() {
   const [mapLayer, setMapLayer] = useState("street");
   const [pilots, setPilots] = useState(demoPilots);
   const [flying, setFlying] = useState(false);
+  const [shareLivePosition, setShareLivePosition] = useState(false);
+  const shareLiveRef = useRef(false);
   const [ownPosition, setOwnPosition] = useState(null);
   const [trail, setTrail] = useState([]);
   const [currentFlightId, setCurrentFlightId] = useState(null);
@@ -275,6 +277,7 @@ function App() {
     if (window.__flightWatch != null && navigator.geolocation) navigator.geolocation.clearWatch(window.__flightWatch);
     window.__flightWatch = null;
     if (supabase) await supabase.auth.signOut();
+    shareLiveRef.current = false; setShareLivePosition(false);
     setFlying(false); setOwnPosition(null); setTrail([]);
   }
 
@@ -289,9 +292,9 @@ function App() {
       const { data: gear } = await supabase.from("pilot_equipment").select("category,name,model,consumption_lph").eq("user_id", session.user.id).order("created_at", { ascending: true });
       const paramotor = (gear || []).find(x => x.category === "Paramotore");
       if (paramotor) { window.__flightFuelRate = Number(paramotor.consumption_lph) || 0; window.__flightEquipmentSnapshot = paramotor; }
-      await publishPosition(p);
+      if (shareLiveRef.current) await publishPosition(p);
       const { data: flightSession, error } = await supabase.from("flight_sessions").insert({ pilot_id: profile?.id || session.user.id, equipment_snapshot: window.__flightEquipmentSnapshot }).select("id").single();
-      if (error || !flightSession) { setStatus("Posizione inviata, ma apertura del logbook non riuscita: " + (error?.message || "sessione non creata")); return; }
+      if (error || !flightSession) { setStatus("GPS attivo, ma apertura del logbook non riuscita: " + (error?.message || "sessione non creata")); return; }
       const activeFlightId = flightSession.id;
       setCurrentFlightId(activeFlightId);
       await saveTrackPoint(activeFlightId, p);
@@ -329,13 +332,29 @@ function App() {
           const { error: pointError } = await saveTrackPoint(activeFlightId, q);
           if (!pointError) window.__lastSavedTrackPoint = { lat: q.lat, lng: q.lng, time: Date.now() };
         }
-        await publishPosition(q);
+        if (shareLiveRef.current) await publishPosition(q);
       }, err => setGpsError(err.message), { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
     }, err => setGpsError(err.message), { enableHighAccuracy: true, timeout: 20000 });
   }
 
+  async function toggleLiveSharing() {
+    if (!session || !supabase) { setStatus("Accedi per modificare la visibilità."); return; }
+    if (shareLiveRef.current) {
+      shareLiveRef.current = false;
+      setShareLivePosition(false);
+      const { error } = await supabase.from("live_positions").delete().eq("user_id", session.user.id);
+      setStatus(error ? "Condivisione disattivata, ma non è stato possibile rimuovere la posizione dal server: " + error.message : "Posizione privata. Il GPS continua a registrare il volo.");
+    } else {
+      shareLiveRef.current = true;
+      setShareLivePosition(true);
+      if (ownPosition && flying) await publishPosition(ownPosition);
+      setStatus("Condivisione attiva: la posizione sarà visibile agli altri piloti durante il volo.");
+    }
+    refreshPilots();
+  }
+
   async function publishPosition(p) {
-    if (!supabase || !session) return;
+    if (!supabase || !session || !shareLiveRef.current) return;
     const { error } = await supabase.from("live_positions").upsert({ pilot_id: profile?.id || session.user.id, user_id: session.user.id, latitude: p.lat, longitude: p.lng, altitude_m: p.altitude_m, speed_kmh: p.speed_kmh, heading: p.heading, updated_at: p.updated_at }, { onConflict: "pilot_id" });
     if (error) setStatus("Errore invio posizione: " + error.message);
     else refreshPilots();
@@ -343,7 +362,7 @@ function App() {
 
   async function stopFlight() {
     if (window.__flightWatch != null && navigator.geolocation) navigator.geolocation.clearWatch(window.__flightWatch);
-    window.__flightWatch = null; window.__lastSavedTrackPoint = null; setFlying(false); setOwnPosition(null);
+    window.__flightWatch = null; window.__lastSavedTrackPoint = null; shareLiveRef.current = false; setShareLivePosition(false); setFlying(false); setOwnPosition(null);
     if (supabase && session) {
       await supabase.from("live_positions").delete().eq("user_id", session.user.id);
       if (currentFlightId) {
@@ -396,7 +415,8 @@ function App() {
               
               <div className="map-legend"><span><i className="legend-dot green"></i> Piloti attivi</span><span><i className="legend-dot blue"></i> La tua posizione</span></div>
             </div>
-            <div className="flight-control"><div><b>{flying ? "Sessione di volo attiva" : "Pronto al decollo?"}</b><span>{flying ? "La posizione viene condivisa con gli iscritti." : "Avvia la condivisione quando sei pronto."}</span></div><button className={flying ? "danger-btn" : "primary-btn"} onClick={flying ? stopFlight : startFlight}>{flying ? <Square size={17} /> : <Plane size={17} />} {flying ? "Termina volo" : "Avvia il mio volo"}</button></div>
+            <div className="flight-control"><div><b>{flying ? "Sessione di volo attiva" : "Pronto al decollo?"}</b><span>{flying ? (shareLivePosition ? "Posizione visibile agli altri piloti · volo registrato." : "Posizione privata · volo registrato nel logbook.") : "Il GPS registra il volo anche senza condividere la posizione."}</span></div><button className={flying ? "danger-btn" : "primary-btn"} onClick={flying ? stopFlight : startFlight}>{flying ? <Square size={17} /> : <Plane size={17} />} {flying ? "Termina volo" : "Avvia il mio volo"}</button></div>
+            {session && <div className="live-privacy-control"><div><b><Shield size={17}/> Visibilità della mia posizione</b><small>{shareLivePosition ? "PUBBLICA durante il volo: gli altri piloti possono vederti." : "PRIVATA: solo tu vedi il GPS e registri i voli."}</small></div><button type="button" className={shareLivePosition ? "outline-btn" : "primary-btn"} onClick={toggleLiveSharing} aria-pressed={shareLivePosition}>{shareLivePosition ? "Rendi privata" : "Condividi posizione"}</button></div>}
             {gpsError && <div className="notice error">{gpsError}</div>}
           </>}
           {tab === "pilots" && <><div className="panel-heading"><div><div className="eyebrow dark">COMMUNITY</div><h2>Piloti in volo</h2><p>Elenco delle posizioni aggiornate di recente.</p></div><Users /></div>{pilots.map(p => <div className="pilot-row" key={p.id}><div className="avatar">{p.nickname?.slice(0, 1)?.toUpperCase() || "P"}</div><div className="pilot-info"><b>{p.nickname}</b><span>{p.region || "Italia"} · {p.demo ? "Posizione demo" : "In volo"}</span></div><div className="pilot-data"><b>{p.altitude_m ?? "—"} m</b><span>{p.speed_kmh ?? "—"} km/h</span></div><span className="status-dot"></span></div>)}</>}
@@ -428,7 +448,7 @@ function App() {
           {status && <div className="notice">{status}</div>}
         </section>
         <aside className="side-panel">
-          <div className="side-card dark-card"><div className="card-icon"><LocateFixed /></div><h3>Vola connesso</h3><p>Attiva il GPS quando inizi il volo. La tua posizione sarà condivisa con gli altri iscritti fino a quando terminerai la sessione.</p><div className="privacy-line"><Shield size={15} /> Condivisione volontaria</div></div>
+          <div className="side-card dark-card"><div className="card-icon"><LocateFixed /></div><h3>Vola connesso</h3><p>Il GPS registra i tuoi voli anche in modalità privata. Decidi tu se mostrare la tua posizione agli altri piloti durante il volo.</p><div className="privacy-line"><Shield size={15} /> Condivisione facoltativa · privata all’avvio</div></div>
           <div className="side-card"><h3>La piattaforma</h3><div className="feature-line"><Users /><div><b>Una community</b><span>Piloti da tutte le regioni</span></div></div><div className="feature-line"><Route /><div><b>Tracce di volo</b><span>Storico e statistiche personali</span></div></div><div className="feature-line"><Gauge /><div><b>Dati di volo</b><span>Quota, velocità e direzione GPS</span></div></div><div className="feature-line"><Clock3 /><div><b>Posizioni recenti</b><span>Le posizioni scadono dopo 2 minuti</span></div></div></div>
           <div className="side-card admin-card"><div className="card-icon pale"><Shield /></div><h3>Amministrazione</h3><p>Ruoli previsti: amministratore principale, amministratore e pilota. Solo l'amministratore principale può nominare altri amministratori.</p></div>
         </aside>
