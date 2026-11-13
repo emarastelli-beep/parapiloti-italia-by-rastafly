@@ -67,12 +67,41 @@ function airborneFeatures(points, map) {
         properties: { top: Math.max(2, alt - terrain) } });
     }
   }
-  return {rail:{type:"FeatureCollection",features:rail},posts:{type:"FeatureCollection",features:posts},sampled};
+  return {rail:{type:"FeatureCollection",features:rail},posts:{type:"FeatureCollection",features:posts},sampled,samples};
+}
+
+function updateSelection(map, points, index, samples) {
+  const source = map.getSource("flight-chart-selection");
+  if (!source) return;
+  const p = index == null ? null : points[index];
+  let features = [];
+  if (p && p.altitude_m != null && [p.lng,p.lat,p.altitude_m].every(v=>Number.isFinite(Number(v)))) {
+    const lng=Number(p.lng), lat=Number(p.lat), altitude=Number(p.altitude_m);
+    const terrain = samples?.[index];
+    const queried = Number.isFinite(terrain) ? terrain : map.queryTerrainElevation([lng,lat],{exaggerated:false});
+    const ground = Number.isFinite(queried) ? queried : Math.max(0,Number(points[0]?.altitude_m)||0);
+    const flightHeight=Math.max(2,altitude-ground);
+    // The rail uses the maximum endpoint elevation for each dash segment.
+    // Align the marker with that visible rail surface, not below it.
+    const neighbors=[index-1,index+1].filter(i=>i>=0&&i<points.length&&points[i].altitude_m!=null);
+    const nearbyHeights=neighbors.map(i=>{
+      const g=samples?.[i];
+      return Math.max(2,Number(points[i].altitude_m)-(Number.isFinite(g)?g:ground));
+    });
+    const railTop=Math.max(flightHeight,...nearbyHeights)+2;
+    const markerTop=railTop+70;
+    features=[{type:"Feature",geometry:{type:"Polygon",coordinates:[square(lng,lat,65)]},
+      properties:{base:Math.max(0,railTop-8),top:markerTop}}];
+  }
+  source.setData({type:"FeatureCollection",features});
 }
 
 export default function FlightTerrain3D({ points, activeIndex }) {
   const container = useRef(null);
   const mapRef = useRef(null);
+  const groundSamplesRef = useRef(null);
+  const selectedIndexRef = useRef(activeIndex);
+  selectedIndexRef.current = activeIndex;
 
   const [message, setMessage] = useState("");
   const valid = (points || []).filter(p => Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lng)) && Math.abs(Number(p.lat)) <= 90 && Math.abs(Number(p.lng)) <= 180);
@@ -133,8 +162,10 @@ export default function FlightTerrain3D({ points, activeIndex }) {
             const result=airborneFeatures(valid,map);
             if (!result.rail.features.length || result.sampled === lastSampled) return;
             lastSampled = result.sampled;
+            groundSamplesRef.current = result.samples;
             map.getSource("flight-rail-3d").setData(result.rail);
             map.getSource("flight-posts-3d").setData(result.posts);
+            updateSelection(map, valid, selectedIndexRef.current, result.samples);
             setMessage(result.sampled === 0 ? "Traccia blu 3D visibile con quota terreno provvisoria: in attesa del rilievo altimetrico." : "Traccia blu 3D aggiornata con quote del terreno disponibili.");
           } catch(error) { console.warn("3D terrain samples:",error); }
         };
@@ -147,6 +178,7 @@ export default function FlightTerrain3D({ points, activeIndex }) {
       map.addLayer({ id: "flight-chart-selection", type: "fill-extrusion", source: "flight-chart-selection",
         paint: { "fill-extrusion-color": "#ff8b1a", "fill-extrusion-opacity": 1,
           "fill-extrusion-height": ["get", "top"], "fill-extrusion-base": ["get", "base"] } });
+      updateSelection(map, valid, selectedIndexRef.current, groundSamplesRef.current);
       new maplibregl.Marker({ color: "#13a879" }).setLngLat(coords[0]).addTo(map);
       new maplibregl.Marker({ color: "#d9473e" }).setLngLat(coords[coords.length - 1]).addTo(map);
       map.fitBounds(boundsFor(valid), { padding: 75, maxZoom: 14, pitch: 65, bearing: -25, duration: 0 });
@@ -162,24 +194,13 @@ export default function FlightTerrain3D({ points, activeIndex }) {
     return () => { canvas.removeEventListener("webglcontextlost", onContextLost); mapRef.current = null; try { map.remove(); } catch (_) { /* cleanup */ } };
   }, [points]);
 
-  // Update selection without creating or destroying MapLibre Marker instances.
+  // Keep chart selection synchronized with the same terrain samples as the blue rail.
   useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !map.isStyleLoaded() || !map.getSource("flight-chart-selection")) return;
-    const p = activeIndex == null ? null : valid[activeIndex];
-    let features = [];
-    if (p && p.altitude_m != null && [p.lng, p.lat, p.altitude_m].every(v => Number.isFinite(Number(v)))) {
-      try {
-        const lng = Number(p.lng), lat = Number(p.lat), altitude = Number(p.altitude_m);
-        const ground = map.queryTerrainElevation([lng, lat], { exaggerated: false });
-        const reference = Number.isFinite(ground) ? ground : Math.max(0, Number(valid[0]?.altitude_m) || 0);
-        const height = Math.max(2, altitude - reference);
-        features = [{ type: "Feature", geometry: { type: "Polygon", coordinates: [square(lng, lat, 28)] },
-          properties: { base: Math.max(0, height - 24), top: height + 12 } }];
-      } catch (error) { console.warn("Selezione quota 3D:", error); }
-    }
-    map.getSource("flight-chart-selection").setData({ type: "FeatureCollection", features });
-  }, [activeIndex, points]);
+    const map=mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    try { updateSelection(map,valid,activeIndex,groundSamplesRef.current); }
+    catch(error) { console.warn("Selezione quota 3D:",error); }
+  }, [activeIndex,points]);
 
   if (valid.length < 2) return <div className="flight-map-empty">Servono almeno due punti GPS per la visualizzazione 3D.</div>;
   return <div className="terrain-3d-wrap">
