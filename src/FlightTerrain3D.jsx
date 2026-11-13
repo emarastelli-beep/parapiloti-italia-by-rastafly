@@ -11,31 +11,78 @@ function boundsFor(points) {
   return [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]];
 }
 
-function flightRibbon(points, map) {
-  const features = [];
-  for (let i = 0; i < points.length - 1; i += 2) {
-    const a = points[i], b = points[Math.min(i + 1, points.length - 1)];
+// Custom WebGL line layer: every vertex is positioned at its own GPS altitude
+// above mean sea level, not at a height relative to the underlying terrain.
+function createAirborneLayer(points) {
+  const vertices = [];
+  for (let i = 0; i < points.length - 1; i++) {
+    const a = points[i], b = points[i + 1];
     if (a.altitude_m == null || b.altitude_m == null) continue;
-    const groundA = map.queryTerrainElevation([Number(a.lng), Number(a.lat)], { exaggerated: false });
-    const groundB = map.queryTerrainElevation([Number(b.lng), Number(b.lat)], { exaggerated: false });
-    if (!Number.isFinite(groundA) || !Number.isFinite(groundB)) continue;
-    const agl = Math.max(3, (Number(a.altitude_m) - groundA + Number(b.altitude_m) - groundB) / 2);
-    const midLat = (Number(a.lat) + Number(b.lat)) / 2;
-    const cosLat = Math.max(0.1, Math.cos(midLat * Math.PI / 180));
-    const dx = (Number(b.lng) - Number(a.lng)) * cosLat, dy = Number(b.lat) - Number(a.lat);
-    const norm = Math.hypot(dx, dy);
-    if (norm < 1e-10) continue;
-    const width = 7 / 111320;
-    const ox = (-dy / norm) * width / cosLat, oy = (dx / norm) * width;
-    const corners = [
-      [Number(a.lng) + ox, Number(a.lat) + oy],
-      [Number(b.lng) + ox, Number(b.lat) + oy],
-      [Number(b.lng) - ox, Number(b.lat) - oy],
-      [Number(a.lng) - ox, Number(a.lat) - oy]
-    ];
-    features.push({ type: "Feature", geometry: { type: "Polygon", coordinates: [[...corners, corners[0]]] }, properties: { base: Math.max(0, agl - 4), top: agl } });
+    const altA = Number(a.altitude_m), altB = Number(b.altitude_m);
+    if (!Number.isFinite(altA) || !Number.isFinite(altB)) continue;
+    // Split each leg into alternating visible and invisible pieces (dashed 3D track).
+    const steps = 8;
+    for (let k = 0; k < steps; k += 2) {
+      const interpolate = t => {
+        const lng = Number(a.lng) + (Number(b.lng) - Number(a.lng)) * t;
+        const lat = Number(a.lat) + (Number(b.lat) - Number(a.lat)) * t;
+        const altitude = altA + (altB - altA) * t;
+        const p = maplibregl.MercatorCoordinate.fromLngLat({ lng, lat }, altitude);
+        return [p.x, p.y, p.z];
+      };
+      vertices.push(...interpolate(k / steps), ...interpolate((k + 1) / steps));
+    }
   }
-  return { type: "FeatureCollection", features };
+  return {
+    id: "flight-airborne-absolute",
+    type: "custom",
+    renderingMode: "3d",
+    onAdd(map, gl) {
+      this.gl = gl;
+      const vertex = gl.createShader(gl.VERTEX_SHADER);
+      gl.shaderSource(vertex, "uniform mat4 u_matrix; attribute vec3 a_position; void main() { gl_Position = u_matrix * vec4(a_position, 1.0); }");
+      gl.compileShader(vertex);
+      const fragment = gl.createShader(gl.FRAGMENT_SHADER);
+      gl.shaderSource(fragment, "precision mediump float; void main() { gl_FragColor = vec4(0.953, 0.416, 0.173, 1.0); }");
+      gl.compileShader(fragment);
+      const program = gl.createProgram();
+      gl.attachShader(program, vertex);
+      gl.attachShader(program, fragment);
+      gl.linkProgram(program);
+      gl.deleteShader(vertex); gl.deleteShader(fragment);
+      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        const error = gl.getProgramInfoLog(program);
+        gl.deleteProgram(program);
+        throw new Error("Impossibile preparare la traccia 3D: " + error);
+      }
+      this.program = program;
+      this.matrixLocation = gl.getUniformLocation(program, "u_matrix");
+      this.positionLocation = gl.getAttribLocation(program, "a_position");
+      this.buffer = gl.createBuffer();
+      this.vertexCount = vertices.length / 3;
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+      gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    },
+    render(gl, options) {
+      if (!this.vertexCount || !this.program) return;
+      const matrix = options?.defaultProjectionData?.mainMatrix || options?.modelViewProjectionMatrix || options;
+      if (!matrix || matrix.length !== 16) return;
+      gl.useProgram(this.program);
+      gl.uniformMatrix4fv(this.matrixLocation, false, matrix);
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+      gl.enableVertexAttribArray(this.positionLocation);
+      gl.vertexAttribPointer(this.positionLocation, 3, gl.FLOAT, false, 0, 0);
+      gl.lineWidth(2);
+      gl.drawArrays(gl.LINES, 0, this.vertexCount);
+      gl.disableVertexAttribArray(this.positionLocation);
+      gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    },
+    onRemove(map, gl) {
+      if (this.buffer) gl.deleteBuffer(this.buffer);
+      if (this.program) gl.deleteProgram(this.program);
+    }
+  };
 }
 
 export default function FlightTerrain3D({ points, activeIndex }) {
@@ -91,20 +138,10 @@ export default function FlightTerrain3D({ points, activeIndex }) {
       map.addLayer({ id: "flight-path-line", type: "line", source: "flight-path", paint: {
         "line-color": "#f36a2c", "line-width": 3.5, "line-opacity": 0.98, "line-dasharray": [2.5, 2.5]
       }, layout: { "line-cap": "round", "line-join": "round" }});
-      map.addSource("flight-airborne", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
-      map.addLayer({ id: "flight-airborne-ribbon", type: "fill-extrusion", source: "flight-airborne",
-        paint: { "fill-extrusion-color": "#f36a2c", "fill-extrusion-opacity": 0.94,
-          "fill-extrusion-base": ["get", "base"], "fill-extrusion-height": ["get", "top"] } });
-      let ribbonReady = false;
-      const updateElevated = () => {
-        if (ribbonReady) return;
-        try {
-          const ribbon = flightRibbon(valid, map);
-          if (ribbon.features.length) { ribbonReady = true; map.getSource("flight-airborne")?.setData(ribbon); }
-        } catch (error) { console.warn("3D flight ribbon:", error); }
-      };
-      map.once("idle", updateElevated);
-      updateElevated();
+      if (valid.some(p => p.altitude_m != null)) {
+        try { map.addLayer(createAirborneLayer(valid)); }
+        catch (error) { console.warn("Traccia 3D in quota non disponibile", error); }
+      }
       new maplibregl.Marker({ color: "#13a879" }).setLngLat(coords[0]).addTo(map);
       new maplibregl.Marker({ color: "#d9473e" }).setLngLat(coords[coords.length - 1]).addTo(map);
       map.fitBounds(boundsFor(valid), { padding: 75, maxZoom: 14, pitch: 65, bearing: -25, duration: 0 });
@@ -137,6 +174,6 @@ export default function FlightTerrain3D({ points, activeIndex }) {
     <div ref={container} className="terrain-3d-map" aria-label="Traccia del volo sulla mappa tridimensionale del terreno" />
     <div className="terrain-3d-hint">Trascina per ruotare · zoom con + e − · rotellina per scorrere la pagina</div>
     {message && <div className="terrain-3d-notice">{message}</div>}
-    <small className="terrain-3d-disclaimer">Traccia arancione tratteggiata sospesa sul terreno quando sono disponibili quota GPS e dati altimetrici del suolo. Altezza indicativa, non utilizzabile per la navigazione.</small>
+    <small className="terrain-3d-disclaimer">La traccia arancione in aria usa le quote GPS assolute degli stessi punti del grafico altimetrico (metri sul livello del mare). Visualizzazione non adatta alla navigazione.</small>
   </div>;
 }
