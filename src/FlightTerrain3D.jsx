@@ -19,12 +19,14 @@ export default function FlightTerrain3D({ points }) {
 
   useEffect(() => {
     if (!container.current || valid.length < 2) return;
-    if (!maplibregl.supported()) {
+    if (typeof maplibregl.supported === "function" && !maplibregl.supported()) {
       setMessage("La visualizzazione 3D richiede WebGL, non disponibile su questo dispositivo.");
       return;
     }
     const coords = valid.map(p => [Number(p.lng), Number(p.lat)]);
-    const map = new maplibregl.Map({
+    let map;
+    try {
+    map = new maplibregl.Map({
       container: container.current,
       style: {
         version: 8,
@@ -33,7 +35,7 @@ export default function FlightTerrain3D({ points }) {
           terrain: { type: "raster-dem", tiles: [TERRAIN_URL], tileSize: 256, maxzoom: 15, encoding: "terrarium", attribution: "Terrain DEM: AWS Terrain Tiles" }
         },
         layers: [{ id: "base-map", type: "raster", source: "osm" }],
-        terrain: { source: "terrain", exaggeration: 1.35 }
+        // Activate the DEM after the style is ready, to avoid startup errors.
       },
       center: coords[0],
       zoom: 11,
@@ -42,9 +44,17 @@ export default function FlightTerrain3D({ points }) {
       antialias: true,
       attributionControl: true
     });
+    } catch (error) {
+      setMessage("Impossibile avviare il motore 3D: " + (error?.message || "errore sconosciuto"));
+      return;
+    }
     mapRef.current = map;
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
     map.on("load", () => {
+      try {
+        if (typeof map.setTerrain === "function") map.setTerrain({ source: "terrain", exaggeration: 1.35 });
+      } catch (error) { setMessage("Il terreno 3D non è disponibile su questo browser: " + error.message); }
+      try {
       map.addSource("flight-path", { type: "geojson", data: {
         type: "Feature", geometry: { type: "LineString", coordinates: coords }, properties: {}
       }});
@@ -55,11 +65,12 @@ export default function FlightTerrain3D({ points }) {
       new maplibregl.Marker({ color: "#d9473e" }).setLngLat(coords[coords.length - 1]).addTo(map);
       map.fitBounds(boundsFor(valid), { padding: 75, maxZoom: 14, pitch: 65, bearing: -25, duration: 0 });
       map.resize();
+      } catch (error) { setMessage("Errore durante il disegno della traccia: " + error.message); }
     });
     map.on("error", event => {
       if (event?.error) setMessage("Alcune porzioni del rilievo potrebbero non essere disponibili. Verifica la connessione.");
     });
-    return () => { mapRef.current = null; map.remove(); };
+    return () => { mapRef.current = null; try { map.remove(); } catch (_) { /* cleanup */ } };
   }, [points]);
 
   if (valid.length < 2) return <div className="flight-map-empty">Servono almeno due punti GPS per la visualizzazione 3D.</div>;
