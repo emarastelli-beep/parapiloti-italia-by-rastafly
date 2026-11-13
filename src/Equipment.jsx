@@ -45,7 +45,7 @@ export default function Equipment({ supabase, userId, onStatus }) {
       user_id: userId, equipment_id: taskForm.equipment_id || null, title: taskForm.title,
       interval_hours: taskForm.interval_hours ? Number(taskForm.interval_hours) : null,
       interval_days: taskForm.interval_days ? Number(taskForm.interval_days) : null, notes: taskForm.notes,
-      next_due_flight_hours: taskForm.interval_hours ? totalHours + Number(taskForm.interval_hours) : null,
+      next_due_flight_hours: taskForm.interval_hours ? Number(taskForm.interval_hours) : null,
       next_due_at: taskForm.interval_days ? new Date(Date.now() + Number(taskForm.interval_days) * 86400000).toISOString() : null
     });
     if (error) onStatus?.(error.message);
@@ -92,7 +92,7 @@ export default function Equipment({ supabase, userId, onStatus }) {
       {items.map(item => {
         const dueDate = item.next_due_at ? new Date(item.next_due_at) : null;
         const overdue = alerts.some(a => a.id === item.id);
-        return <div className="maintenance-row" key={item.id}><div className="maintenance-row-main"><b>{item.title}</b><span>{item.pilot_equipment?.name || "Attrezzatura"} · {item.interval_hours ? "ogni " + item.interval_hours + " h volo" : ""}{item.interval_days ? " · ogni " + item.interval_days + " giorni" : ""}</span><small>{overdue ? "SCADUTA / DA CONTROLLARE" : "Prossima scadenza: " + (dueDate ? dueDate.toLocaleDateString("it-IT") : item.next_due_flight_hours != null ? item.next_due_flight_hours.toFixed(1) + " h volo" : "non impostata")}</small></div><button className="outline-btn" onClick={() => completeTask(item)}><CheckCircle2 size={15}/> Eseguita</button></div>;
+        return <div className="maintenance-row" key={item.id}><div className="maintenance-row-main"><b>{item.title}</b><span>{item.pilot_equipment?.name || "Attrezzatura"} · {item.interval_hours ? "ogni " + item.interval_hours + " h volo" : ""}{item.interval_days ? " · ogni " + item.interval_days + " giorni" : ""}</span><small>{overdue ? "SCADUTA / DA CONTROLLARE" : "Prossima scadenza: " + (dueDate ? dueDate.toLocaleDateString("it-IT") : item.next_due_flight_hours != null ? "tra " + Math.max(0, Number(item.next_due_flight_hours) - totalHours).toFixed(1) + " h (a " + Number(item.next_due_flight_hours).toFixed(1) + " h totali)" : "non impostata")}</small></div><button className="outline-btn" onClick={() => completeTask(item)}><CheckCircle2 size={15}/> Eseguita</button></div>;
       })}
       <form className="equipment-form maintenance-form" onSubmit={addTask}>
         <input required placeholder="Intervento (es. candela, riduttore...)" value={taskForm.title} onChange={e => setTaskForm({...taskForm,title:e.target.value})}/>
