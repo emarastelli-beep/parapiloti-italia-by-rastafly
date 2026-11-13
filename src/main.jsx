@@ -75,6 +75,16 @@ function FlightTrackMap({ points }) {
   </MapContainer>;
 }
 
+class TerrainErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { error: null }; }
+  static getDerivedStateFromError(error) { return { error }; }
+  componentDidCatch(error) { console.error("PILOT ADVISOR terrain viewer:", error); }
+  render() {
+    if (this.state.error) return <div className="terrain-3d-notice"><b>La mappa 3D non è riuscita ad avviarsi.</b><p>{this.state.error.message || "Errore del visualizzatore."}</p><button type="button" className="outline-btn" onClick={() => this.setState({ error: null })}>Riprova 3D</button></div>;
+    return this.props.children;
+  }
+}
+
 // Demo locale: nessun inserimento in Supabase e nessuna posizione condivisa.
 function createDemoFlight() {
   const start = new Date("2026-11-13T10:00:00+01:00");
@@ -418,7 +428,7 @@ function App() {
         <button type="button" className={flightMapMode === "3d" ? "active" : ""} onClick={() => setFlightMapMode("3d")}>Terreno 3D</button>
       </div>
       <div className={flightMapMode === "3d" ? "flight-modal-map flight-modal-map-3d" : "flight-modal-map"}>
-        {flightMapMode === "3d" ? <Suspense fallback={<div className="flight-map-empty">Caricamento terreno 3D...</div>}><FlightTerrain3D points={selectedFlight.points || []}/></Suspense> : <FlightTrackMap points={selectedFlight.points || []}/>}
+        {flightMapMode === "3d" ? <TerrainErrorBoundary><Suspense fallback={<div className="flight-map-empty">Caricamento terreno 3D...</div>}><FlightTerrain3D points={selectedFlight.points || []}/></Suspense></TerrainErrorBoundary> : <FlightTrackMap points={selectedFlight.points || []}/>}
       </div>
       <div className="flight-modal-stats"><span><small>DURATA</small><b>{String(Math.floor((new Date(selectedFlight.ended_at)-new Date(selectedFlight.started_at))/3600000)).padStart(2,"0")}:{String(Math.floor(((new Date(selectedFlight.ended_at)-new Date(selectedFlight.started_at))%3600000)/60000)).padStart(2,"0")}</b></span><span><small>PUNTI GPS</small><b>{(selectedFlight.points || []).length}</b></span><span><small>MEDIA GPS</small><b>{selectedFlight.avg_speed_kmh == null ? "—" : Number(selectedFlight.avg_speed_kmh).toFixed(1) + " km/h"}</b></span><span><small>MAX GPS</small><b>{selectedFlight.max_speed_kmh == null ? "—" : Number(selectedFlight.max_speed_kmh).toFixed(1) + " km/h"}</b></span><span><small>MIN GPS</small><b>{selectedFlight.min_speed_kmh == null ? "—" : Number(selectedFlight.min_speed_kmh).toFixed(1) + " km/h"}</b></span><span><small>CARBURANTE STIMATO</small><b>{selectedFlight.fuel_consumed_l == null ? "—" : Number(selectedFlight.fuel_consumed_l).toFixed(1) + " L"}</b></span></div>
       {!selectedFlight.demo && <button className="primary-btn full" onClick={() => shareFlight(selectedFlight)}><Share2 size={17}/> Condividi volo e traccia</button>}
