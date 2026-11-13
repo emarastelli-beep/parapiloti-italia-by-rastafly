@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { createClient } from "@supabase/supabase-js";
 import { MapContainer, TileLayer, Marker, Popup, Tooltip, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
-import { Wind, Map as MapIcon, Users, UserCircle, Plane, Square, LogOut, Shield, Mail, LocateFixed, Clock3, Gauge, Route, Menu, X, BookOpen, Share2, Maximize2, CalendarDays, MapPin, Wrench } from "lucide-react";
+import { Wind, Map as MapIcon, Users, UserCircle, Plane, Square, LogOut, Shield, Mail, LocateFixed, Clock3, Gauge, Route, Menu, X, BookOpen, Share2, Maximize2, Trash2, CalendarDays, MapPin, Wrench } from "lucide-react";
 import "leaflet/dist/leaflet.css";
 import "./styles.css";
 import Equipment from "./Equipment.jsx";
@@ -115,6 +115,20 @@ function App() {
     }
     setLogbook((data || []).map(f => ({ ...f, points: points.filter(p => p.flight_session_id === f.id) })));
     setLogbookLoading(false);
+  }
+
+  async function deleteFlight(flight) {
+    const dateLabel = new Date(flight.started_at).toLocaleDateString("it-IT");
+    if (!window.confirm(`Vuoi eliminare definitivamente il volo del ${dateLabel} e la relativa traccia GPS? L'operazione non si può annullare.`)) return;
+    if (!supabase || !session) return;
+    const { error } = await supabase.from("flight_sessions").delete().eq("id", flight.id).eq("pilot_id", session.user.id);
+    if (error) {
+      setStatus("Impossibile eliminare il volo: " + error.message);
+      return;
+    }
+    setLogbook(current => current.filter(item => item.id !== flight.id));
+    setSelectedFlight(current => current?.id === flight.id ? null : current);
+    setStatus("Volo e traccia GPS eliminati dal logbook.");
   }
 
   function flightGpx(flight) {
@@ -311,6 +325,7 @@ function App() {
                 <div className="flight-log-details"><b>{start.toLocaleDateString("it-IT", { day:"2-digit", month:"long", year:"numeric" })}</b><span><Clock3 size={14}/> {start.toLocaleTimeString("it-IT", {hour:"2-digit",minute:"2-digit"})} · {duration}</span><small><MapPin size={13}/> {pts.length} punti GPS · {f.avg_speed_kmh != null ? Number(f.avg_speed_kmh).toFixed(1) + " km/h media" : "velocità n/d"} · {f.fuel_consumed_l != null ? Number(f.fuel_consumed_l).toFixed(1) + " L stimati" : "carburante n/d"}</small></div>
                 <button className="log-share" onClick={e => { e.stopPropagation(); shareFlight(f); }} aria-label="Condividi volo"><Share2 size={18}/></button>
                 <button className="log-expand" onClick={e => { e.stopPropagation(); setSelectedFlight(f); }} aria-label="Apri dettaglio"><Maximize2 size={17}/></button>
+                <button className="log-delete" onClick={e => { e.stopPropagation(); deleteFlight(f); }} aria-label="Elimina volo" title="Elimina volo"><Trash2 size={17}/></button>
               </article>;
             })}</div>}
           </>}
@@ -340,6 +355,7 @@ function App() {
       <div className="flight-modal-stats"><span><small>DURATA</small><b>{String(Math.floor((new Date(selectedFlight.ended_at)-new Date(selectedFlight.started_at))/3600000)).padStart(2,"0")}:{String(Math.floor(((new Date(selectedFlight.ended_at)-new Date(selectedFlight.started_at))%3600000)/60000)).padStart(2,"0")}</b></span><span><small>PUNTI GPS</small><b>{(selectedFlight.points || []).length}</b></span><span><small>MEDIA GPS</small><b>{selectedFlight.avg_speed_kmh == null ? "—" : Number(selectedFlight.avg_speed_kmh).toFixed(1) + " km/h"}</b></span><span><small>MAX GPS</small><b>{selectedFlight.max_speed_kmh == null ? "—" : Number(selectedFlight.max_speed_kmh).toFixed(1) + " km/h"}</b></span><span><small>MIN GPS</small><b>{selectedFlight.min_speed_kmh == null ? "—" : Number(selectedFlight.min_speed_kmh).toFixed(1) + " km/h"}</b></span><span><small>CARBURANTE STIMATO</small><b>{selectedFlight.fuel_consumed_l == null ? "—" : Number(selectedFlight.fuel_consumed_l).toFixed(1) + " L"}</b></span></div>
       <button className="primary-btn full" onClick={() => shareFlight(selectedFlight)}><Share2 size={17}/> Condividi volo e traccia</button>
       <button className="outline-btn full" onClick={() => exportFlightGpx(selectedFlight)}><Route size={17}/> Esporta traccia GPX</button>
+      <button className="log-delete-modal full" onClick={() => deleteFlight(selectedFlight)}><Trash2 size={17}/> Elimina questo volo</button>
       <small className="muted">La traccia è un riepilogo GPS indicativo, non uno strumento di navigazione.</small>
     </section></div>}
     <footer><span>© {new Date().getFullYear()} PILOT ADVISOR · RASTA7212</span><span>Prototipo tecnico · Non è un dispositivo di sicurezza aeronautica</span></footer>
