@@ -21,16 +21,17 @@ function square(lng, lat, metres) {
 function airborneFeatures(points, map) {
   const rail = [], posts = [];
   let sampled = 0;
+  const fallbackGround = Math.max(0, Number(points[0]?.altitude_m) || 0);
   const ground = p => {
     const value = map.queryTerrainElevation([Number(p.lng), Number(p.lat)], { exaggerated: false });
     if (Number.isFinite(value)) sampled++;
-    return Number.isFinite(value) ? value : null;
+    return Number.isFinite(value) ? value : fallbackGround;
   };
   const samples = points.map(p => p.altitude_m == null ? null : ground(p));
   for (let i = 0; i < points.length - 1; i++) {
     const a = points[i], b = points[i+1], altA = Number(a.altitude_m), altB = Number(b.altitude_m);
     if (a.altitude_m == null || b.altitude_m == null || !Number.isFinite(altA) || !Number.isFinite(altB)) continue;
-    if (samples[i] == null || samples[i+1] == null) continue;
+
     const aHeight = Math.max(2, altA - samples[i]);
     const bHeight = Math.max(2, altB - samples[i+1]);
     const dx = Number(b.lng) - Number(a.lng), dy = Number(b.lat) - Number(a.lat);
@@ -52,7 +53,7 @@ function airborneFeatures(points, map) {
   }
   for(let i=0;i<points.length;i+=6) {
     const p=points[i], alt=Number(p.altitude_m);
-    if (p.altitude_m == null || !Number.isFinite(alt) || samples[i] == null) continue;
+    if (p.altitude_m == null || !Number.isFinite(alt)) continue;
     posts.push({type:"Feature",geometry:{type:"Polygon",coordinates:[square(Number(p.lng),Number(p.lat),2.2)]},properties:{top:Math.max(2,alt-samples[i])}});
   }
   return {rail:{type:"FeatureCollection",features:rail},posts:{type:"FeatureCollection",features:posts},sampled};
@@ -120,17 +121,19 @@ export default function FlightTerrain3D({ points, activeIndex }) {
         map.addLayer({id:"flight-rail-3d",type:"fill-extrusion",source:"flight-rail-3d",
           paint:{"fill-extrusion-color":"#0869d9","fill-extrusion-opacity":0.98,
             "fill-extrusion-height":["get","top"],"fill-extrusion-base":["get","base"]}});
-        let updated=false;
+        let lastSampled = -1;
         const refresh=()=>{
-          if (updated || !map.getSource("flight-rail-3d")) return;
+          if (!map.getSource("flight-rail-3d")) return;
           try {
             const result=airborneFeatures(valid,map);
-            if (!result.rail.features.length) return;
+            if (!result.rail.features.length || result.sampled === lastSampled) return;
+            lastSampled = result.sampled;
             map.getSource("flight-rail-3d").setData(result.rail);
             map.getSource("flight-posts-3d").setData(result.posts);
-            updated=true;
+            setMessage(result.sampled === 0 ? "Traccia blu 3D visibile con quota terreno provvisoria: in attesa del rilievo altimetrico." : "Traccia blu 3D aggiornata con quote del terreno disponibili.");
           } catch(error) { console.warn("3D terrain samples:",error); }
         };
+        refresh();
         map.once("idle",refresh);
         map.on("moveend",refresh);
       }
@@ -166,6 +169,6 @@ export default function FlightTerrain3D({ points, activeIndex }) {
     <div ref={container} className="terrain-3d-map" aria-label="Traccia del volo sulla mappa tridimensionale del terreno" />
     <div className="terrain-3d-hint">Trascina per ruotare · zoom con + e − · rotellina per scorrere la pagina</div>
     {message && <div className="terrain-3d-notice">{message}</div>}
-    <small className="terrain-3d-disclaimer">Traccia blu sospesa e sostegni verticali: quota GPS MSL meno quota del terreno. La linea tratteggiata sottostante indica la proiezione al suolo. Simulazione non adatta alla navigazione.</small>
+    <small className="terrain-3d-disclaimer">Traccia blu e sostegni verticali: quote GPS del grafico. Se il rilievo DEM non è ancora caricato, viene usata temporaneamente una quota terreno di riferimento, segnalata sopra. Simulazione non adatta alla navigazione.</small>
   </div>;
 }
