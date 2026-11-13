@@ -147,3 +147,23 @@ footer{background:#0b2032;border-top:2px solid #64b5df;color:#b8d2e1}
  .flight-modal{padding:20px 16px}
  .flight-modal-map{height:260px}
 }
+
+/* Attrezzatura e manutenzione */
+.equipment-page{display:flex;flex-direction:column;gap:18px}
+.equipment-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.equipment-summary>div{background:#f3f8f6;border:1px solid #e2eee8;border-radius:11px;padding:14px;display:flex;flex-direction:column;gap:4px}
+.equipment-summary b{font:800 21px Manrope;color:#1b795f}.equipment-summary span{font-size:10px;color:#758892}
+.maintenance-alert{display:flex;gap:12px;align-items:center;background:#fff1ed;border:1px solid #f3c7b9;color:#a33e2c;border-radius:11px;padding:13px;font-size:13px}
+.maintenance-alert div{display:flex;flex-direction:column;gap:4px}.maintenance-alert span{font-size:11px;line-height:1.45}
+.equipment-section{border:1px solid #e7edef;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.equipment-section h3{display:flex;align-items:center;gap:8px;margin:0;color:#244354;font:800 15px Manrope}
+.equipment-row,.maintenance-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 0;border-bottom:1px solid #edf1f2}
+.equipment-row>div,.maintenance-row-main{display:flex;flex-direction:column;gap:4px;min-width:0}
+.equipment-row b,.maintenance-row b{font-size:12px;color:#294354}.equipment-row span,.maintenance-row span{font-size:10px;color:#81919a}
+.maintenance-row small{font-size:10px;color:#b34c37;font-weight:700}
+.equipment-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.equipment-form input,.equipment-form select{width:100%;min-width:0;border:1px solid #dfe7e9;border-radius:8px;padding:10px;font:12px 'DM Sans';background:white;color:#294354}
+.equipment-form button{grid-column:span 2}
+.maintenance-row .outline-btn{white-space:nowrap;padding:9px 10px}
+.equipment-footnote{font-size:10px;line-height:1.5;color:#8b989e;margin:0}
+@media(max-width:600px){.equipment-summary{gap:6px}.equipment-summary>div{padding:10px}.equipment-summary b{font-size:18px}.equipment-form{grid-template-columns:1fr}.equipment-form button{grid-column:auto}.maintenance-row{align-items:flex-start;flex-direction:column}.maintenance-row .outline-btn{align-self:flex-end}}
