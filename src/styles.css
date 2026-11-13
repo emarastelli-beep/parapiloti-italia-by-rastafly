@@ -278,3 +278,21 @@ footer{background:#081d2d;border-top:2px solid #5ebbe5;color:#c1d9e6;letter-spac
  .side-panel{display:flex}
  footer{padding:18px 14px;line-height:1.5;text-align:center}
 }
+
+
+/* Responsive correction: stack profile and information panels vertically */
+@media(max-width:900px){
+  .content-grid{display:flex!important;flex-direction:column!important;align-items:stretch!important;width:100%;max-width:100%;gap:16px}
+  .content-grid>.main-panel,.content-grid>.side-panel{display:flex;width:100%;max-width:100%;min-width:0;flex:0 0 auto}
+  .content-grid>.main-panel{order:1}
+  .content-grid>.side-panel{order:2;flex-direction:column}
+  .profile-card{width:100%;max-width:100%;min-width:0;margin:0 auto;padding:26px 18px;overflow-wrap:anywhere}
+  .profile-card .outline-btn{max-width:100%;white-space:normal}
+  .main-panel{overflow:hidden}
+}
+@media(max-width:560px){
+  .content-grid{padding-left:10px;padding-right:10px}
+  .content-grid>.main-panel{padding:16px 14px}
+  .profile-card{padding:24px 14px}
+  .profile-card .muted{overflow-wrap:anywhere}
+}
