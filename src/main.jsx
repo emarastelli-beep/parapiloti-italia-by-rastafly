@@ -108,15 +108,14 @@ function AirspaceOverlay() {
 
 function MapView({ pilots, ownPosition, trail, mapLayer }) {
   const center = ownPosition ? [ownPosition.lat, ownPosition.lng] : [42.8, 12.5];
-  const openAipKey = import.meta.env.VITE_OPENAIP_API_KEY;
   const satellite = mapLayer === "satellite";
   return <MapContainer center={center} zoom={ownPosition ? 15 : 6} scrollWheelZoom className="map">
     {satellite
       ? <TileLayer attribution='Imagery &copy; <a href="https://www.esri.com/">Esri</a>' url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" maxZoom={19} />
       : <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />}
-    {mapLayer === "aviation" && openAipKey && <TileLayer
+    {mapLayer === "aviation" && <TileLayer
       attribution='Dati aeronautici &copy; <a href="https://www.openaip.net/">OpenAIP</a>'
-      url={`https://api.tiles.openaip.net/api/data/openaip/{z}/{x}/{y}.png?apiKey=${encodeURIComponent(openAipKey)}`}
+      url="/api/airspace-tiles?z={z}&x={x}&y={y}"
       opacity={0.88}
       maxZoom={14}
       zIndex={450}
@@ -400,7 +399,7 @@ function App() {
                 <button type="button" className={mapLayer === "aviation" ? "active" : ""} onClick={() => setMapLayer("aviation")}><Plane size={15} /> Aeronautica</button>
               </div>
               <MapView key={flying ? "flight-map" : "normal-map"} pilots={pilots} ownPosition={ownPosition} trail={trail} mapLayer={mapLayer} />
-              {mapLayer === "aviation" && !import.meta.env.VITE_OPENAIP_API_KEY && <div className="aviation-layer-notice"><b>Livello aeronautico da attivare</b><span>Per mostrare spazi aerei e aeroporti serve configurare la chiave API OpenAIP. La mappa sottostante non rappresenta gli spazi aerei.</span></div>}
+              
               <div className="map-legend"><span><i className="legend-dot green"></i> Piloti attivi</span><span><i className="legend-dot blue"></i> La tua posizione</span></div>
             </div>
             <div className="flight-control"><div><b>{flying ? "Sessione di volo attiva" : "Pronto al decollo?"}</b><span>{flying ? "La posizione viene condivisa con gli iscritti." : "Avvia la condivisione quando sei pronto."}</span></div><button className={flying ? "danger-btn" : "primary-btn"} onClick={flying ? stopFlight : startFlight}>{flying ? <Square size={17} /> : <Plane size={17} />} {flying ? "Termina volo" : "Avvia il mio volo"}</button></div>
