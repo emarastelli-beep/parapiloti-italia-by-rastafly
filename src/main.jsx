@@ -436,7 +436,7 @@ function App() {
     </main>
     {selectedFlight && <div className="flight-modal-backdrop" onClick={() => setSelectedFlight(null)}><section className="flight-modal" onClick={e => e.stopPropagation()}>
       <button className="modal-close" onClick={() => setSelectedFlight(null)} aria-label="Chiudi">×</button>
-      <div className="eyebrow dark">PILOT ADVISOR · BY RASTA7212</div><h2>{selectedFlight.demo ? "Volo dimostrativo · Feltre" : "Il mio volo"}</h2>{selectedFlight.demo && <p className="demo-flight-label">SIMULAZIONE · Nessun volo reale registrato · Nessun dato aggiunto al tuo account</p>}
+      <div className="eyebrow dark">PILOT ADVISOR · BY RASTA7212</div><h2>{selectedFlight.demo ? "Volo dimostrativo · Feltre" : "Il mio volo"}</h2>{selectedFlight.demo && <p className="demo-flight-label">SIMULAZIONE · Nessun volo reale registrato · Nessun dato aggiunto al tuo account · VERSIONE 3D-QUOTA-2350</p>}
       <b>{new Date(selectedFlight.started_at).toLocaleDateString("it-IT", { dateStyle:"full" })}</b>
       <p>{new Date(selectedFlight.started_at).toLocaleTimeString("it-IT", {hour:"2-digit",minute:"2-digit"})} – {new Date(selectedFlight.ended_at).toLocaleTimeString("it-IT", {hour:"2-digit",minute:"2-digit"})}</p>
       <div className="flight-view-switch" role="group" aria-label="Visualizzazione della traccia">
