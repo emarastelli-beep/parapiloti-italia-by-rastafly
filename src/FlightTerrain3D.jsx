@@ -3,7 +3,7 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 const TERRAIN_URL = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png";
-const TOPO_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}";
+const TOPO_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
 
 function boundsFor(points) {
   const lngs = points.map(p => Number(p.lng));
@@ -83,7 +83,7 @@ export default function FlightTerrain3D({ points, activeIndex }) {
           topo: { type: "raster", tiles: [TOPO_URL], tileSize: 256, attribution: "Tiles © Esri, HERE, Garmin, OpenStreetMap contributors" },
           terrain: { type: "raster-dem", tiles: [TERRAIN_URL], tileSize: 256, maxzoom: 15, encoding: "terrarium", attribution: "Terrain DEM: AWS Terrain Tiles" }
         },
-        layers: [{ id: "base-map", type: "raster", source: "topo" }],
+        layers: [{ id: "base-map", type: "raster", source: "topo", paint: { "raster-saturation": 0.22, "raster-contrast": 0.16, "raster-brightness-min": 0.04 } }],
         // Activate the DEM after the style is ready, to avoid startup errors.
       },
       center: coords[0],
@@ -163,6 +163,6 @@ export default function FlightTerrain3D({ points, activeIndex }) {
     <div ref={container} className="terrain-3d-map" aria-label="Traccia del volo sulla mappa tridimensionale del terreno" />
     <div className="terrain-3d-hint">Trascina per ruotare · zoom con + e − · rotellina per scorrere la pagina</div>
     {message && <div className="terrain-3d-notice">{message}</div>}
-    <small className="terrain-3d-disclaimer">Traccia blu sospesa e sostegni verticali azzurri ravvicinati, senza proiezione al suolo: quote GPS del grafico. Se il rilievo DEM non è ancora caricato, viene usata temporaneamente una quota terreno di riferimento, segnalata sopra. Simulazione non adatta alla navigazione.</small>
+    <small className="terrain-3d-disclaimer">Mappa satellitare più contrastata, traccia blu sospesa e sostegni verticali azzurri ravvicinati, senza proiezione al suolo: quote GPS del grafico. Se il rilievo DEM non è ancora caricato, viene usata temporaneamente una quota terreno di riferimento, segnalata sopra. Simulazione non adatta alla navigazione.</small>
   </div>;
 }
