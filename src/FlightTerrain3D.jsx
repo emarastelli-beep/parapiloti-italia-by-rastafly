@@ -38,7 +38,7 @@ function airborneFeatures(points, map) {
     const cosLat = Math.cos(Number(a.lat)*Math.PI/180);
     const len = Math.hypot(dx*cosLat,dy);
     if (len < 1e-10) continue;
-    const width = 14 / 111320;
+    const width = 34 / 111320;
     const ox = -dy/len*width/cosLat, oy = dx*cosLat/len*width;
     // Alternate visible sections and gaps for a dashed flight route.
     for (let j=0;j<8;j+=2) {
@@ -63,7 +63,7 @@ function airborneFeatures(points, map) {
       const terrain = samples[i] + (samples[i + 1] - samples[i]) * t;
       if (![lat, lng, alt, terrain].every(Number.isFinite)) continue;
       posts.push({ type: "Feature",
-        geometry: { type: "Polygon", coordinates: [square(lng, lat, 3.5)] },
+        geometry: { type: "Polygon", coordinates: [square(lng, lat, 8)] },
         properties: { top: Math.max(2, alt - terrain) } });
     }
   }
@@ -122,7 +122,7 @@ export default function FlightTerrain3D({ points, activeIndex }) {
         map.addSource("flight-rail-3d",{type:"geojson",data:empty});
         map.addSource("flight-posts-3d",{type:"geojson",data:empty});
         map.addLayer({id:"flight-posts-3d",type:"fill-extrusion",source:"flight-posts-3d",
-          paint:{"fill-extrusion-color":"#79c8f9","fill-extrusion-opacity":0.38,"fill-extrusion-height":["get","top"],"fill-extrusion-base":0}});
+          paint:{"fill-extrusion-color":"#79c8f9","fill-extrusion-opacity":0.56,"fill-extrusion-height":["get","top"],"fill-extrusion-base":0}});
         map.addLayer({id:"flight-rail-3d",type:"fill-extrusion",source:"flight-rail-3d",
           paint:{"fill-extrusion-color":"#0064df","fill-extrusion-opacity":1,
             "fill-extrusion-height":["get","top"],"fill-extrusion-base":["get","base"]}});
@@ -142,9 +142,11 @@ export default function FlightTerrain3D({ points, activeIndex }) {
         map.once("idle",refresh);
         map.on("moveend",refresh);
       }
+      // A tiny elevated orange extrusion marks the GPS altitude, not ground level.
       map.addSource("flight-chart-selection", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
-      map.addLayer({ id: "flight-chart-selection", type: "circle", source: "flight-chart-selection",
-        paint: { "circle-radius": 7, "circle-color": "#ff9c22", "circle-stroke-color": "#ffffff", "circle-stroke-width": 2 } });
+      map.addLayer({ id: "flight-chart-selection", type: "fill-extrusion", source: "flight-chart-selection",
+        paint: { "fill-extrusion-color": "#ff8b1a", "fill-extrusion-opacity": 1,
+          "fill-extrusion-height": ["get", "top"], "fill-extrusion-base": ["get", "base"] } });
       new maplibregl.Marker({ color: "#13a879" }).setLngLat(coords[0]).addTo(map);
       new maplibregl.Marker({ color: "#d9473e" }).setLngLat(coords[coords.length - 1]).addTo(map);
       map.fitBounds(boundsFor(valid), { padding: 75, maxZoom: 14, pitch: 65, bearing: -25, duration: 0 });
@@ -165,12 +167,18 @@ export default function FlightTerrain3D({ points, activeIndex }) {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded() || !map.getSource("flight-chart-selection")) return;
     const p = activeIndex == null ? null : valid[activeIndex];
-    const coordinates = p && Number.isFinite(Number(p.lng)) && Number.isFinite(Number(p.lat))
-      ? [Number(p.lng), Number(p.lat)] : null;
-    map.getSource("flight-chart-selection").setData({
-      type: "FeatureCollection",
-      features: coordinates ? [{ type: "Feature", geometry: { type: "Point", coordinates }, properties: {} }] : []
-    });
+    let features = [];
+    if (p && p.altitude_m != null && [p.lng, p.lat, p.altitude_m].every(v => Number.isFinite(Number(v)))) {
+      try {
+        const lng = Number(p.lng), lat = Number(p.lat), altitude = Number(p.altitude_m);
+        const ground = map.queryTerrainElevation([lng, lat], { exaggerated: false });
+        const reference = Number.isFinite(ground) ? ground : Math.max(0, Number(valid[0]?.altitude_m) || 0);
+        const height = Math.max(2, altitude - reference);
+        features = [{ type: "Feature", geometry: { type: "Polygon", coordinates: [square(lng, lat, 28)] },
+          properties: { base: Math.max(0, height - 24), top: height + 12 } }];
+      } catch (error) { console.warn("Selezione quota 3D:", error); }
+    }
+    map.getSource("flight-chart-selection").setData({ type: "FeatureCollection", features });
   }, [activeIndex, points]);
 
   if (valid.length < 2) return <div className="flight-map-empty">Servono almeno due punti GPS per la visualizzazione 3D.</div>;
@@ -178,6 +186,6 @@ export default function FlightTerrain3D({ points, activeIndex }) {
     <div ref={container} className="terrain-3d-map" aria-label="Traccia del volo sulla mappa tridimensionale del terreno" />
     <div className="terrain-3d-hint">Trascina per ruotare · zoom con + e − · rotellina per scorrere la pagina</div>
     {message && <div className="terrain-3d-notice">{message}</div>}
-    <small className="terrain-3d-disclaimer">Mappa satellitare più contrastata, traccia blu sospesa e sostegni verticali azzurri ravvicinati, senza proiezione al suolo: quote GPS del grafico. Se il rilievo DEM non è ancora caricato, viene usata temporaneamente una quota terreno di riferimento, segnalata sopra. Simulazione non adatta alla navigazione.</small>
+    <small className="terrain-3d-disclaimer">Mappa satellitare più contrastata, traccia blu più marcata e parete di sostegni verticali azzurri, senza proiezione al suolo: quote GPS del grafico. Se il rilievo DEM non è ancora caricato, viene usata temporaneamente una quota terreno di riferimento, segnalata sopra. Simulazione non adatta alla navigazione.</small>
   </div>;
 }
